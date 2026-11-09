@@ -6,7 +6,8 @@ import { parseBody, singleWalletSchema } from "@/infrastructure/http/requestVali
 export async function POST(request: Request) {
   try {
     const { walletId, amount } = await parseBody(request, singleWalletSchema);
-    return NextResponse.json({ transaction: withdrawFunds(walletId, amount) }, { status: 201 });
+    const transaction = await withdrawFunds(walletId, amount);
+    return NextResponse.json({ transaction }, { status: 201 });
   } catch (error) {
     return toErrorResponse(error);
   }

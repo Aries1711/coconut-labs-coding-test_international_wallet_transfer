@@ -42,13 +42,15 @@ export default async function TransactionDetailPage({
 
   let transaction: Transaction;
   try {
-    transaction = getTransaction(id);
+    transaction = await getTransaction(id);
   } catch (error) {
     if (error instanceof AppError && error.code === "TRANSACTION_NOT_FOUND") notFound();
     throw error;
   }
 
-  const labels = new Map(listWallets().map((wallet) => [wallet.id, wallet.label]));
+  const labels = new Map<string, string>(
+    (await listWallets()).map((wallet) => [wallet.id, wallet.label]),
+  );
 
   return (
     <div className="space-y-6">

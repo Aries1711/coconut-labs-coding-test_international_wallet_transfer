@@ -8,7 +8,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    return NextResponse.json({ wallet: getWallet(id) });
+    return NextResponse.json({ wallet: await getWallet(id) });
   } catch (error) {
     return toErrorResponse(error);
   }

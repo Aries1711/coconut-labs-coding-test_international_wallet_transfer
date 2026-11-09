@@ -1,7 +1,7 @@
-import { balanceOf, type Transaction } from "@/domain/entities/Transaction";
-import { formatMinor } from "@/domain/entities/Money";
-import type { Wallet, WalletView } from "@/domain/entities/Wallet";
 import { isCurrency } from "@/domain/entities/Currency";
+import { formatMinor } from "@/domain/entities/Money";
+import { balanceOf, type Transaction } from "@/domain/entities/Transaction";
+import type { Wallet, WalletView } from "@/domain/entities/Wallet";
 import { AppError } from "@/domain/errors";
 import type { WalletRepository } from "@/domain/repositories/WalletRepository";
 
@@ -9,8 +9,11 @@ import type { WalletRepository } from "@/domain/repositories/WalletRepository";
 export type WalletDeps = { wallets: WalletRepository };
 
 /** Resolves a wallet or throws the 404 the API contract promises. */
-export function requireWallet(wallets: WalletRepository, id: string): Wallet {
-  const wallet = wallets.getWallet(id);
+export async function requireWallet(
+  wallets: WalletRepository,
+  id: string,
+): Promise<Wallet> {
+  const wallet = await wallets.getWallet(id);
   if (!wallet) {
     throw new AppError("WALLET_NOT_FOUND", 404, `No wallet with id "${id}".`);
   }
@@ -24,11 +27,11 @@ export function requireWallet(wallets: WalletRepository, id: string): Wallet {
   return wallet;
 }
 
-export function requireDistinctWallets(
+export async function requireDistinctWallets(
   wallets: WalletRepository,
   fromWalletId: string,
   toWalletId: string,
-): [Wallet, Wallet] {
+): Promise<[Wallet, Wallet]> {
   if (fromWalletId === toWalletId) {
     throw new AppError(
       "SAME_WALLET",
@@ -36,21 +39,27 @@ export function requireDistinctWallets(
       "The source and target wallet must be different.",
     );
   }
-  return [requireWallet(wallets, fromWalletId), requireWallet(wallets, toWalletId)];
+  return [
+    await requireWallet(wallets, fromWalletId),
+    await requireWallet(wallets, toWalletId),
+  ];
 }
 
 /** Current balance for one wallet, folded from its ledger entries. */
-export function balanceMinorOf(wallets: WalletRepository, walletId: string): number {
-  return balanceOf(wallets.listTransactions(walletId), walletId);
+export async function balanceMinorOf(
+  wallets: WalletRepository,
+  walletId: string,
+): Promise<number> {
+  return balanceOf(await wallets.listTransactions(walletId), walletId);
 }
 
 /** No overdraft: the balance is re-read from the ledger at the point of use. */
-export function assertSufficientFunds(
+export async function assertSufficientFunds(
   wallets: WalletRepository,
   wallet: Wallet,
   amountMinor: number,
-): void {
-  const available = balanceMinorOf(wallets, wallet.id);
+): Promise<void> {
+  const available = await balanceMinorOf(wallets, wallet.id);
   if (available < amountMinor) {
     throw new AppError(
       "INSUFFICIENT_FUNDS",

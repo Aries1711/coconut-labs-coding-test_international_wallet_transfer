@@ -3,13 +3,16 @@ import type { Wallet } from "../entities/Wallet";
 
 /**
  * Storage boundary, owned by the domain and implemented in infrastructure.
- * `append` is the only write, and it is append-only: a file or SQL adapter can
- * replace the in-memory one without any layer above this interface changing.
+ * `append` is the only write, and it is append-only.
+ *
+ * Every method is async because an implementation may be network-backed
+ * (Redis, SQL). The in-memory implementation satisfies it trivially; nothing
+ * above this interface knows or cares which one is in use.
  */
 export interface WalletRepository {
-  listWallets(): Wallet[];
-  getWallet(id: string): Wallet | undefined;
-  listTransactions(walletId?: string): Transaction[];
-  getTransaction(id: string): Transaction | undefined;
-  append(entry: NewTransaction): Transaction;
+  listWallets(): Promise<Wallet[]>;
+  getWallet(id: string): Promise<Wallet | undefined>;
+  listTransactions(walletId?: string): Promise<Transaction[]>;
+  getTransaction(id: string): Promise<Transaction | undefined>;
+  append(entry: NewTransaction): Promise<Transaction>;
 }

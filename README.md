@@ -50,6 +50,31 @@ server. Errors share one shape:
 `CURRENCY_MISMATCH`, `CURRENCY_MATCH_FOR_CONVERSION`, `INSUFFICIENT_FUNDS`,
 `ROUNDS_TO_ZERO`) · `503` `RATE_UNAVAILABLE`.
 
+## Deploying
+
+Hosted on **Vercel**, with the ledger in **Upstash Redis**.
+
+1. Vercel dashboard → **Storage** → **Create Database** → **Upstash Redis**
+   (free tier) → connect it to the project. `KV_REST_API_URL` and
+   `KV_REST_API_TOKEN` are injected for you.
+2. **Add New** → **Project** → import this repository. Next.js is detected; no
+   build settings to change.
+3. Deploy. Pushes to `main` deploy automatically.
+
+A direct Upstash account also works (`UPSTASH_REDIS_REST_URL` /
+`UPSTASH_REDIS_REST_TOKEN`).
+
+**Locally you need no Redis** — with no variables set the in-memory ledger is
+used, so `npm run dev` and `npm test` stay dependency-free. On Vercel without
+Redis configured the app throws at startup on purpose: serverless gives no
+instance affinity, so an in-memory ledger would silently lose transactions
+between requests, and a deploy that looks healthy while losing money is worse
+than one that refuses to start.
+
+Static hosting (GitHub Pages) cannot serve this app at all — the API routes
+have nowhere to run. See
+[`ai_docs/deployment.md`](agentic_coding_orchestrator/ai_docs/deployment.md).
+
 ## Design decisions
 
 **Money is never a float.** Every amount is an integer count of minor units.
@@ -91,8 +116,14 @@ writing.
 
 ## Known limitations
 
-- **Data resets on restart.** The store is in memory; `npm run dev` always starts
-  from the same six seeded wallets.
+- **Storage depends on where it runs.** Locally the ledger is in memory and
+  resets on restart. On Vercel it is in Redis and persists; reseeding is
+  guarded so a cold start cannot duplicate the opening deposits.
+- **Concurrent writes can race.** A use case reads the balance, then appends.
+  Within one process that is effectively atomic; across serverless instances it
+  is not, so two simultaneous withdrawals could both pass the funds check. The
+  fix is a per-wallet lock or a Lua check-and-append; see
+  [`ai_docs/deployment.md`](agentic_coding_orchestrator/ai_docs/deployment.md).
 - **Single simulated user, no auth.** Every request is that user. `/api/rates`
   is an unauthenticated passthrough (cached, but unthrottled).
 - **Daily mid-market rates.** Frankfurter publishes ECB reference rates once per

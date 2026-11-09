@@ -31,10 +31,12 @@ export default async function TransactionsPage({
   searchParams: Promise<{ walletId?: string }>;
 }) {
   const { walletId } = await searchParams;
-  const wallets = listWallets();
-  const labels = new Map(wallets.map((wallet) => [wallet.id, wallet.label]));
+  const wallets = await listWallets();
+  const labels = new Map<string, string>(
+    wallets.map((wallet) => [wallet.id, wallet.label]),
+  );
   const known = walletId && labels.has(walletId) ? walletId : undefined;
-  const transactions = listTransactions(known);
+  const transactions = await listTransactions(known);
 
   return (
     <div className="space-y-6">
