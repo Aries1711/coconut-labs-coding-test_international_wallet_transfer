@@ -169,6 +169,10 @@ export async function convert(
     );
   }
 
+  // Awaiting the rate yielded the event loop, so re-check funds against the
+  // ledger immediately before the append: nothing else may have spent them.
+  assertSufficientFunds(source, amountMinor);
+
   return repo.append({
     type: "CONVERSION",
     fromWalletId: source.id,

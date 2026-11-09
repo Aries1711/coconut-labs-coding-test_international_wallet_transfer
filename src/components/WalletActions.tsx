@@ -184,31 +184,36 @@ function TwoWalletForm({
 
   const from = wallets.find((wallet) => wallet.id === fromWalletId);
   const to = wallets.find((wallet) => wallet.id === toWalletId);
-  const [rate, setRate] = useState<string | null>(null);
-  const [rateError, setRateError] = useState<string | null>(null);
+  // Keyed by the pair so a stale response for a previous pair is ignored and
+  // the effect only ever sets state from its own async callback.
+  const pairKey = from && to ? `${from.currency}:${to.currency}` : "";
+  const crossCurrency = Boolean(from && to && from.currency !== to.currency);
+  const [preview, setPreview] = useState<
+    { key: string; text?: string; error?: string } | null
+  >(null);
 
   useEffect(() => {
-    if (!showRate || !from || !to || from.currency === to.currency) {
-      setRate(null);
-      setRateError(null);
-      return;
-    }
+    if (!showRate || !crossCurrency || !from || !to) return;
     const controller = new AbortController();
-    setRate(null);
-    setRateError(null);
+    const key = `${from.currency}:${to.currency}`;
     fetch(`/api/rates?from=${from.currency}&to=${to.currency}`, {
       signal: controller.signal,
     })
       .then(async (response) => {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload?.error?.message ?? "Rate unavailable.");
-        setRate(`1 ${from.currency} = ${payload.rate} ${to.currency} (as of ${payload.date})`);
+        setPreview({
+          key,
+          text: `1 ${from.currency} = ${payload.rate} ${to.currency} (as of ${payload.date})`,
+        });
       })
       .catch((cause: Error) => {
-        if (cause.name !== "AbortError") setRateError(cause.message);
+        if (cause.name !== "AbortError") setPreview({ key, error: cause.message });
       });
     return () => controller.abort();
-  }, [showRate, from, to]);
+  }, [showRate, crossCurrency, from, to]);
+
+  const shownPreview = preview?.key === pairKey && crossCurrency ? preview : null;
 
   return (
     <Card title={title}>
@@ -240,9 +245,11 @@ function TwoWalletForm({
         />
         <AmountInput value={amount} onChange={setAmount} currency={from?.currency} />
         <p className="text-xs text-slate-500">{hint}</p>
-        {showRate && (rate || rateError) && (
-          <p className={`text-xs ${rateError ? "text-red-600" : "text-slate-700"}`}>
-            {rateError ?? rate}
+        {showRate && shownPreview && (
+          <p
+            className={`text-xs ${shownPreview.error ? "text-red-600" : "text-slate-700"}`}
+          >
+            {shownPreview.error ?? shownPreview.text}
           </p>
         )}
         <button type="submit" className={buttonClass} disabled={pending}>

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { NewTransaction, Transaction, Wallet } from "../types";
+import type { Transaction, Wallet } from "../types";
 import type { WalletRepository } from "./WalletRepository";
 
 type Store = { wallets: Wallet[]; transactions: Transaction[] };
