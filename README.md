@@ -50,6 +50,36 @@ server. Errors share one shape:
 `CURRENCY_MISMATCH`, `CURRENCY_MATCH_FOR_CONVERSION`, `INSUFFICIENT_FUNDS`,
 `ROUNDS_TO_ZERO`) · `503` `RATE_UNAVAILABLE`.
 
+## Deploying
+
+The app needs a host that runs server code: every page is server-rendered on
+demand and the whole API is route handlers. Static hosting (GitHub Pages) can
+not serve it — see
+[`ai_docs/deployment.md`](agentic_coding_orchestrator/ai_docs/deployment.md).
+
+**Render (free tier)** — `render.yaml` is committed, so:
+
+1. Render dashboard → **New** → **Blueprint**
+2. Pick this repository; the blueprint fills in build and start commands
+3. **Apply** — the first build takes a few minutes
+
+Or create it by hand (any host that runs Node):
+
+| Setting | Value |
+| --- | --- |
+| Build command | `npm ci && npm run build` |
+| Start command | `npm start` |
+| Node version | 20.9+ (`engines` pins this) |
+
+`next start` binds to `$PORT` on its own, so no extra configuration is needed.
+
+**A long-lived process is required, not serverless.** The ledger is an
+in-memory object: on a serverless platform a request can hit a different
+instance than the one that recorded the last transaction, and a deposit would
+appear to vanish. On Render it behaves exactly as it does locally. The free
+instance sleeps after ~15 minutes idle, which makes the first load slow and
+resets the ledger to its seeded state — the same limitation as any restart.
+
 ## Design decisions
 
 **Money is never a float.** Every amount is an integer count of minor units.

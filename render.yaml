@@ -1,0 +1,22 @@
+# Render blueprint. Create the service in one step:
+#   Render dashboard -> New -> Blueprint -> pick this repo.
+#
+# Why a long-lived Node process and not a serverless host: the ledger lives in
+# memory inside this process. On a serverless platform each request can land on
+# a different instance, so a deposit would not be visible to the render that
+# follows it. See agentic_coding_orchestrator/ai_docs/deployment.md.
+services:
+  - type: web
+    name: coconut-wallet
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    autoDeployTrigger: commit
+    buildCommand: npm ci && npm run build
+    # `next start` binds to $PORT on its own; no -p flag needed.
+    startCommand: npm start
+    healthCheckPath: /api/wallets
+    envVars:
+      - key: NODE_VERSION
+        value: "22.11.0"
