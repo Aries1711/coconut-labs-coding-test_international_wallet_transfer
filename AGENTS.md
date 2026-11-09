@@ -140,10 +140,21 @@ user journeys and product decisions.)
 ### Domain rules — non-negotiable
 
 - **Money is never a float.** Every amount is an integer count of minor units.
-  Decimals come from `Intl.NumberFormat(...).resolvedOptions().maximumFractionDigits`,
-  never a hand-written table. Decimal strings are parsed by string
-  manipulation, so `"8.70"` is exactly `870`. The only float in the system is
-  inside `formatMinor`, for display, and it never feeds back into stored state.
+  Decimal strings are parsed by string manipulation, so `"8.70"` is exactly
+  `870`. The only float in the system is inside `formatMinor`, for display, and
+  it never feeds back into stored state.
+- **The minor-unit exponent is pinned in `MINOR_UNIT_EXPONENT`, not read from
+  `Intl`.** This reverses the original brief, deliberately, and it is not up for
+  re-litigation — see issue #10. `Intl`'s exponents come from the CLDR data
+  bundled with each Node build; CLDR moved IDR from 2 fraction digits to 0, so
+  local Node 22.2.0 and the deployed runtime disagreed and the same persisted
+  ledger row was read 100× apart.
+
+  The distinction to keep: deriving a **rendering** from a library is fine, and
+  `formatMinor` still uses `Intl` for symbol and grouping. Deriving the
+  **meaning of persisted data** from a library is not, because the library can
+  change underneath data already written. If a currency is added to
+  `SUPPORTED_CURRENCIES`, the table must gain an exponent — `tsc` enforces this.
 - **The ledger is the source of truth.** `Transaction` entries are append-only;
   balances are folded from them on every read. Nothing is ever edited or
   deleted — a mistake is corrected with a new, opposite entry.
@@ -203,9 +214,11 @@ user journeys and product decisions.)
 - **After moving or deleting files, `rm -rf .next`** before trusting a dev run.
 - **Vitest needs `vitest.config.mts`** for the `@/` alias — it is not read from
   `tsconfig.json`. The `.mts` extension avoids Vite's CJS deprecation warning.
-- **CLDR gives IDR two fraction digits**, so IDR is held in sen and `"1"` means
-  `IDR 0.01`. This follows the brief's rule of taking decimals from `Intl`; do
-  not special-case it.
+- **IDR has exponent 0**: `"1"` means one rupiah, and an IDR amount with
+  decimal places is rejected. Older `Intl` data says 2 and this repository used
+  to follow it — that was the bug in #10, not the fix. Do **not** change
+  `MINOR_UNIT_EXPONENT` back to an `Intl` lookup because a runtime disagrees
+  with it; the table disagreeing with the runtime is the entire point.
 - **Port 3000 may be occupied.** Read the dev server's ready line for the real
   port instead of assuming.
 - **No Redis is needed locally.** With no `KV_REST_API_*` /
