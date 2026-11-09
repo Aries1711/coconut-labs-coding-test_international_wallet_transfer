@@ -2,7 +2,7 @@
 
 - **Issue:** https://github.com/Aries1711/coconut-labs-coding-test_international_wallet_transfer/issues/2
 - **Branch:** `development/feature/wallet-filter-click-select` (shared with ISSUE-1; this work extracts the component that fix landed in)
-- **PR:** not yet opened
+- **PR:** https://github.com/Aries1711/coconut-labs-coding-test_international_wallet_transfer/pull/3
 - **Status:** awaiting review
 
 ## What was asked
@@ -50,4 +50,8 @@ so both usages inherit the fix.
 
 ## Outcome
 
-Pending review. Verified in `../ai_reviews/ISSUE-2-acceptance.md`.
+Fixed in `e8eb3bc`, on PR #3, awaiting manual review before merge.
+Verified in `../ai_reviews/ISSUE-2-acceptance.md` — 8/8, 69 tests passing.
+
+Standing consequence: `components/Listbox.tsx` is now the app's only dropdown.
+A native `<select>` reappearing anywhere in `src/` is a regression.

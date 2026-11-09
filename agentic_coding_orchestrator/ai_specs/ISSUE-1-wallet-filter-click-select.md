@@ -2,8 +2,8 @@
 
 - **Issue:** https://github.com/Aries1711/coconut-labs-coding-test_international_wallet_transfer/issues/1
 - **Branch:** `development/feature/wallet-filter-click-select`
-- **PR:** not yet opened
-- **Status:** in progress
+- **PR:** https://github.com/Aries1711/coconut-labs-coding-test_international_wallet_transfer/pull/3
+- **Status:** awaiting review
 
 ## What was asked
 
@@ -48,4 +48,10 @@ See `../ai_logs/2026-11-09.md`.
 
 ## Outcome
 
-Pending review.
+Fixed in `e8eb3bc`, on PR #3, awaiting manual review before merge. The fix was
+superseded in place by ISSUE-2: rather than living inline in `WalletFilter`, the
+`onMouseDown` preventDefault now sits in the shared `components/Listbox.tsx`, so
+every dropdown in the app inherits it.
+
+Acceptance run: `../ai_reviews/ISSUE-1-acceptance.md` — 6/6, with the test
+failing before the fix and passing after.
