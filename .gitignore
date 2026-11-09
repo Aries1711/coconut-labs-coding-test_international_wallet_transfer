@@ -33,6 +33,10 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# ...but the template declares only variable NAMES, never values, and a
+# reviewer cannot set up the project without it, so it stays tracked.
+!.env.example
+
 # vercel
 .vercel
 

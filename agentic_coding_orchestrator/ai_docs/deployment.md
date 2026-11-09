@@ -70,9 +70,30 @@ The wallet set itself stays in code — it is fixed configuration, not state.
 A direct Upstash account works too — the container accepts
 `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` as well.
 
+**Configuration lives in one place.** Every variable the code reads is declared
+in the committed `.env.example`; real values go in `.env.local`, which is
+gitignored. `.env.local` rather than `.env` because `vercel env pull` writes
+that exact filename by default, so pulling the live configuration down does not
+leave two files that disagree. The variable-by-variable table is in the README
+under *Environment variables*.
+
 **There is no silent fallback.** If the app boots on Vercel without Redis
-configured it throws at startup, by design: a deploy that looks healthy while
-quietly losing every transaction is the worst available outcome.
+configured it throws, by design: a deploy that looks healthy while quietly
+losing every transaction is the worst available outcome. This was confirmed by
+running it rather than reasoning about it — `VERCEL=1 npm run build` with no
+Redis variables set exits 1 at page-data collection:
+
+```
+> Build error occurred
+Error: Failed to collect page data for /api/transfers
+  [cause]: Error: Running on Vercel without Redis configured. Set
+  KV_REST_API_URL and KV_REST_API_TOKEN (or the UPSTASH_REDIS_REST_*
+  equivalents): the in-memory ledger cannot survive across serverless instances.
+```
+
+Note that the failure arrives at **build** time, not first request, and that
+Next's headline names a route instead of the cause — the reason is one line
+down under `[cause]`.
 
 Locally, no Redis is needed — with no variables set the in-memory ledger is
 used, so `npm run dev` and `npm test` stay dependency-free.
