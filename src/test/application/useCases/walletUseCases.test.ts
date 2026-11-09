@@ -44,8 +44,8 @@ function setup(rates: ExchangeRateRepository = stubRates("158.26")) {
 describe("convertCurrency", () => {
   it("moves both legs in one ledger entry and stores the rate", async () => {
     const { convert, balanceMinor } = setup();
-    const usdBefore = balanceMinor("usd-main");
-    const jpyBefore = balanceMinor("jpy-main");
+    const usdBefore = await balanceMinor("usd-main");
+    const jpyBefore = await balanceMinor("jpy-main");
 
     const tx = await convert("usd-main", "jpy-main", "10.00");
 
@@ -54,26 +54,26 @@ describe("convertCurrency", () => {
     expect(tx.targetAmountMinor).toBe(1583); // 1000 * 158.26 * 10^-2, half-up
     expect(tx.rate).toBe("158.26");
     expect(tx.rateDate).toBe("2026-11-09");
-    expect(balanceMinor("usd-main")).toBe(usdBefore - 1000);
-    expect(balanceMinor("jpy-main")).toBe(jpyBefore + 1583);
+    expect(await balanceMinor("usd-main")).toBe(usdBefore - 1000);
+    expect(await balanceMinor("jpy-main")).toBe(jpyBefore + 1583);
   });
 
   it("records nothing when the rate provider is unavailable", async () => {
     const { convert, balanceMinor, listTransactions } = setup(unavailableRates());
-    const ledgerBefore = listTransactions().length;
-    const usdBefore = balanceMinor("usd-main");
+    const ledgerBefore = (await listTransactions()).length;
+    const usdBefore = await balanceMinor("usd-main");
 
     await expect(convert("usd-main", "gbp-main", "10.00")).rejects.toMatchObject({
       code: "RATE_UNAVAILABLE",
       status: 503,
     });
-    expect(listTransactions()).toHaveLength(ledgerBefore);
-    expect(balanceMinor("usd-main")).toBe(usdBefore);
+    expect(await listTransactions()).toHaveLength(ledgerBefore);
+    expect(await balanceMinor("usd-main")).toBe(usdBefore);
   });
 
   it("rejects a same-currency pair and an overdraft without writing", async () => {
     const { convert, listTransactions } = setup();
-    const ledgerBefore = listTransactions().length;
+    const ledgerBefore = (await listTransactions()).length;
 
     await expect(convert("usd-main", "usd-savings", "1.00")).rejects.toBeInstanceOf(
       AppError,
@@ -81,112 +81,118 @@ describe("convertCurrency", () => {
     await expect(convert("usd-main", "jpy-main", "9999999.00")).rejects.toMatchObject({
       code: "INSUFFICIENT_FUNDS",
     });
-    expect(listTransactions()).toHaveLength(ledgerBefore);
+    expect(await listTransactions()).toHaveLength(ledgerBefore);
   });
 
   it("refuses a conversion that rounds away to nothing in the target currency", async () => {
     // 1 sen of IDR at a tiny rate lands below one JPY unit.
     const { convert, deposit, listTransactions } = setup(stubRates("0.0094"));
-    deposit("idr-main", "0.01");
-    const ledgerBefore = listTransactions().length;
+    await deposit("idr-main", "0.01");
+    const ledgerBefore = (await listTransactions()).length;
 
     await expect(convert("idr-main", "jpy-main", "0.01")).rejects.toMatchObject({
       code: "ROUNDS_TO_ZERO",
     });
-    expect(listTransactions()).toHaveLength(ledgerBefore);
+    expect(await listTransactions()).toHaveLength(ledgerBefore);
   });
 });
 
 describe("transferFunds", () => {
-  it("moves funds 1:1 between same-currency wallets", () => {
+  it("moves funds 1:1 between same-currency wallets", async () => {
     const { transfer, balanceMinor } = setup();
-    const fromBefore = balanceMinor("usd-main");
-    const toBefore = balanceMinor("usd-savings");
+    const fromBefore = await balanceMinor("usd-main");
+    const toBefore = await balanceMinor("usd-savings");
 
-    const tx = transfer("usd-main", "usd-savings", "25.50");
+    const tx = await transfer("usd-main", "usd-savings", "25.50");
 
     expect(tx.amountMinor).toBe(2550);
-    expect(balanceMinor("usd-main")).toBe(fromBefore - 2550);
-    expect(balanceMinor("usd-savings")).toBe(toBefore + 2550);
+    expect(await balanceMinor("usd-main")).toBe(fromBefore - 2550);
+    expect(await balanceMinor("usd-savings")).toBe(toBefore + 2550);
   });
 
-  it("refuses a cross-currency pair, the same wallet, and unknown wallets", () => {
+  it("refuses a cross-currency pair, the same wallet, and unknown wallets", async () => {
     const { transfer } = setup();
-    expect(() => transfer("usd-main", "eur-main", "1.00")).toThrowError(AppError);
-    expect(() => transfer("usd-main", "usd-main", "1.00")).toThrowError(AppError);
-    expect(() => transfer("ghost", "usd-main", "1.00")).toThrowError(AppError);
+    await expect(transfer("usd-main", "eur-main", "1.00")).rejects.toThrowError(
+      AppError,
+    );
+    await expect(transfer("usd-main", "usd-main", "1.00")).rejects.toThrowError(
+      AppError,
+    );
+    await expect(transfer("ghost", "usd-main", "1.00")).rejects.toThrowError(
+      AppError,
+    );
   });
 });
 
 describe("depositFunds", () => {
-  it("credits the wallet and appends a DEPOSIT entry", () => {
+  it("credits the wallet and appends a DEPOSIT entry", async () => {
     const { deposit, balanceMinor } = setup();
-    const before = balanceMinor("eur-main");
+    const before = await balanceMinor("eur-main");
 
-    const tx = deposit("eur-main", "12.34");
+    const tx = await deposit("eur-main", "12.34");
 
     expect(tx.type).toBe("DEPOSIT");
     expect(tx.toWalletId).toBe("eur-main");
     expect(tx.fromWalletId).toBeUndefined();
     expect(tx.amountMinor).toBe(1234);
-    expect(balanceMinor("eur-main")).toBe(before + 1234);
+    expect(await balanceMinor("eur-main")).toBe(before + 1234);
   });
 
-  it("rejects an unknown wallet and a malformed amount without writing", () => {
+  it("rejects an unknown wallet and a malformed amount without writing", async () => {
     const { deposit, listTransactions } = setup();
-    const ledgerBefore = listTransactions().length;
+    const ledgerBefore = (await listTransactions()).length;
 
-    expect(() => deposit("ghost", "1.00")).toThrowError(
+    await expect(deposit("ghost", "1.00")).rejects.toThrowError(
       expect.objectContaining({ code: "WALLET_NOT_FOUND" }) as unknown as Error,
     );
-    expect(() => deposit("eur-main", "0")).toThrowError(
+    await expect(deposit("eur-main", "0")).rejects.toThrowError(
       expect.objectContaining({ code: "INVALID_AMOUNT" }) as unknown as Error,
     );
-    expect(listTransactions()).toHaveLength(ledgerBefore);
+    expect(await listTransactions()).toHaveLength(ledgerBefore);
   });
 });
 
 describe("withdrawFunds", () => {
-  it("debits the wallet and appends a WITHDRAWAL entry", () => {
+  it("debits the wallet and appends a WITHDRAWAL entry", async () => {
     const { withdraw, balanceMinor } = setup();
-    const before = balanceMinor("usd-savings");
+    const before = await balanceMinor("usd-savings");
 
-    const tx = withdraw("usd-savings", "15.00");
+    const tx = await withdraw("usd-savings", "15.00");
 
     expect(tx.type).toBe("WITHDRAWAL");
     expect(tx.fromWalletId).toBe("usd-savings");
     expect(tx.toWalletId).toBeUndefined();
     expect(tx.amountMinor).toBe(1500);
-    expect(balanceMinor("usd-savings")).toBe(before - 1500);
+    expect(await balanceMinor("usd-savings")).toBe(before - 1500);
   });
 
-  it("refuses to overdraw and writes nothing", () => {
+  it("refuses to overdraw and writes nothing", async () => {
     const { withdraw, balanceMinor, listTransactions } = setup();
-    const before = balanceMinor("gbp-main"); // seeded at zero
-    const ledgerBefore = listTransactions().length;
+    const before = await balanceMinor("gbp-main"); // seeded at zero
+    const ledgerBefore = (await listTransactions()).length;
 
-    expect(() => withdraw("gbp-main", "0.01")).toThrowError(
+    await expect(withdraw("gbp-main", "0.01")).rejects.toThrowError(
       expect.objectContaining({ code: "INSUFFICIENT_FUNDS" }) as unknown as Error,
     );
-    expect(balanceMinor("gbp-main")).toBe(before);
-    expect(listTransactions()).toHaveLength(ledgerBefore);
+    expect(await balanceMinor("gbp-main")).toBe(before);
+    expect(await listTransactions()).toHaveLength(ledgerBefore);
   });
 });
 
 describe("listWallets / getWallet", () => {
-  it("derives every wallet's balance from the ledger", () => {
+  it("derives every wallet's balance from the ledger", async () => {
     const { listWallets, balanceMinor } = setup();
-    const wallets = listWallets();
+    const wallets = await listWallets();
     const usdMain = wallets.find((wallet) => wallet.id === "usd-main");
 
     expect(wallets).toHaveLength(6);
-    expect(usdMain?.balanceMinor).toBe(balanceMinor("usd-main"));
+    expect(usdMain?.balanceMinor).toBe(await balanceMinor("usd-main"));
     expect(usdMain?.balanceFormatted).toMatch(/^\$[\d,]+\.\d{2}$/);
   });
 
-  it("404s for an unknown wallet", () => {
+  it("404s for an unknown wallet", async () => {
     const { getWallet } = setup();
-    expect(() => getWallet("ghost")).toThrowError(
+    await expect(getWallet("ghost")).rejects.toThrowError(
       expect.objectContaining({
         code: "WALLET_NOT_FOUND",
         status: 404,
@@ -196,9 +202,9 @@ describe("listWallets / getWallet", () => {
 });
 
 describe("listTransactions / getTransaction", () => {
-  it("filters to only the entries touching one wallet", () => {
+  it("filters to only the entries touching one wallet", async () => {
     const { listTransactions } = setup();
-    const filtered = listTransactions("jpy-main");
+    const filtered = await listTransactions("jpy-main");
 
     expect(filtered.length).toBeGreaterThan(0);
     for (const tx of filtered) {
@@ -206,12 +212,12 @@ describe("listTransactions / getTransaction", () => {
     }
   });
 
-  it("404s listing by an unknown wallet, and fetching an unknown transaction", () => {
+  it("404s listing by an unknown wallet, and fetching an unknown transaction", async () => {
     const { listTransactions, getTransaction } = setup();
-    expect(() => listTransactions("ghost")).toThrowError(
+    await expect(listTransactions("ghost")).rejects.toThrowError(
       expect.objectContaining({ code: "WALLET_NOT_FOUND" }) as unknown as Error,
     );
-    expect(() => getTransaction("does-not-exist")).toThrowError(
+    await expect(getTransaction("does-not-exist")).rejects.toThrowError(
       expect.objectContaining({
         code: "TRANSACTION_NOT_FOUND",
         status: 404,
@@ -219,9 +225,9 @@ describe("listTransactions / getTransaction", () => {
     );
   });
 
-  it("round-trips a transaction by id", () => {
+  it("round-trips a transaction by id", async () => {
     const { deposit, getTransaction } = setup();
-    const tx = deposit("gbp-main", "1.00");
-    expect(getTransaction(tx.id)).toEqual(tx);
+    const tx = await deposit("gbp-main", "1.00");
+    await expect(getTransaction(tx.id)).resolves.toEqual(tx);
   });
 });

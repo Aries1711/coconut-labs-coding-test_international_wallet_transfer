@@ -9,12 +9,16 @@ import {
 
 /** Same-currency move, 1:1. Both legs are one ledger entry, so it is atomic. */
 export function makeTransferFunds({ wallets }: WalletDeps) {
-  return function transferFunds(
+  return async function transferFunds(
     fromWalletId: string,
     toWalletId: string,
     amount: string,
-  ): Transaction {
-    const [source, target] = requireDistinctWallets(wallets, fromWalletId, toWalletId);
+  ): Promise<Transaction> {
+    const [source, target] = await requireDistinctWallets(
+      wallets,
+      fromWalletId,
+      toWalletId,
+    );
     if (source.currency !== target.currency) {
       throw new AppError(
         "CURRENCY_MISMATCH",
@@ -23,7 +27,7 @@ export function makeTransferFunds({ wallets }: WalletDeps) {
       );
     }
     const amountMinor = parseAmountToMinor(amount, source.currency);
-    assertSufficientFunds(wallets, source, amountMinor);
+    await assertSufficientFunds(wallets, source, amountMinor);
     return wallets.append({
       type: "TRANSFER",
       fromWalletId: source.id,

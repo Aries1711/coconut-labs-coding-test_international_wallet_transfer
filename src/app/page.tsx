@@ -4,8 +4,8 @@ import { listWallets } from "@/infrastructure/container";
 /** Balances are derived per request from the ledger, so never cache this page. */
 export const dynamic = "force-dynamic";
 
-export default function DashboardPage() {
-  const wallets = listWallets();
+export default async function DashboardPage() {
+  const wallets = await listWallets();
 
   return (
     <div className="space-y-8">

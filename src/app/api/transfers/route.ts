@@ -6,10 +6,8 @@ import { parseBody, twoWalletSchema } from "@/infrastructure/http/requestValidat
 export async function POST(request: Request) {
   try {
     const { fromWalletId, toWalletId, amount } = await parseBody(request, twoWalletSchema);
-    return NextResponse.json(
-      { transaction: transferFunds(fromWalletId, toWalletId, amount) },
-      { status: 201 },
-    );
+    const transaction = await transferFunds(fromWalletId, toWalletId, amount);
+    return NextResponse.json({ transaction }, { status: 201 });
   } catch (error) {
     return toErrorResponse(error);
   }

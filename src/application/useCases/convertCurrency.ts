@@ -17,7 +17,11 @@ export function makeConvertCurrency({ wallets, rates }: Deps) {
     toWalletId: string,
     amount: string,
   ): Promise<Transaction> {
-    const [source, target] = requireDistinctWallets(wallets, fromWalletId, toWalletId);
+    const [source, target] = await requireDistinctWallets(
+      wallets,
+      fromWalletId,
+      toWalletId,
+    );
     if (source.currency === target.currency) {
       throw new AppError(
         "CURRENCY_MATCH_FOR_CONVERSION",
@@ -26,7 +30,7 @@ export function makeConvertCurrency({ wallets, rates }: Deps) {
       );
     }
     const amountMinor = parseAmountToMinor(amount, source.currency);
-    assertSufficientFunds(wallets, source, amountMinor);
+    await assertSufficientFunds(wallets, source, amountMinor);
 
     // Fetched before the append: a rate failure throws and nothing is recorded.
     const rate = await rates.getRate(source.currency, target.currency);
@@ -46,7 +50,7 @@ export function makeConvertCurrency({ wallets, rates }: Deps) {
 
     // Awaiting the rate yielded the event loop, so re-check funds against the
     // ledger immediately before the append: nothing else may have spent them.
-    assertSufficientFunds(wallets, source, amountMinor);
+    await assertSufficientFunds(wallets, source, amountMinor);
 
     return wallets.append({
       type: "CONVERSION",

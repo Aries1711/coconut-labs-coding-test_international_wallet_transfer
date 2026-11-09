@@ -7,18 +7,19 @@ import { toWalletView, type WalletDeps } from "./shared";
  * rather than one fold per wallet.
  */
 export function makeListWallets({ wallets }: WalletDeps) {
-  return function listWallets(): WalletView[] {
-    const balances = new Map<string, number>(
-      wallets.listWallets().map((wallet) => [wallet.id, 0]),
-    );
-    for (const tx of wallets.listTransactions()) {
+  return async function listWallets(): Promise<WalletView[]> {
+    const [all, transactions] = await Promise.all([
+      wallets.listWallets(),
+      wallets.listTransactions(),
+    ]);
+
+    const balances = new Map<string, number>(all.map((wallet) => [wallet.id, 0]));
+    for (const tx of transactions) {
       for (const walletId of [tx.fromWalletId, tx.toWalletId]) {
         if (!walletId || !balances.has(walletId)) continue;
         balances.set(walletId, balances.get(walletId)! + deltaFor(tx, walletId));
       }
     }
-    return wallets
-      .listWallets()
-      .map((wallet) => toWalletView(wallet, balances.get(wallet.id) ?? 0));
+    return all.map((wallet) => toWalletView(wallet, balances.get(wallet.id) ?? 0));
   };
 }

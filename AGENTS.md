@@ -30,7 +30,7 @@ Product intent, domain vocabulary and the decisions behind the rules are in
 | Styling | Tailwind CSS **v3** only — no component library |
 | Validation | zod, at the HTTP edge only |
 | Tests | Vitest 3 |
-| Storage | In-memory, on `globalThis`, behind a repository interface |
+| Storage | Redis (Upstash) in production, in-memory locally — both behind `WalletRepository` |
 | External API | Frankfurter v2 — `https://api.frankfurter.dev/v2/rate/{BASE}/{QUOTE}`, no key |
 | Node | 22.2.0 (see the Tailwind gotcha below before changing this) |
 
@@ -92,7 +92,23 @@ writing code.
 5. ### ⛔ STOP. Hand over for review.
    Post the results and state plainly that **nothing is committed and you are awaiting review**. Do not run `git commit`. Do not open a PR. Wait for the user to respond.
 
-   **This step is breached most often when the work went well.** A clean verification table feels like a finish line; it is the point to hand over. It has been broken before on a previous project (Issue 6 / PR #12) — the work had passed every criterion, and the momentum carried straight through the gate.
+   **This step is breached most often when the work went well.** A clean verification table feels like a finish line; it is the point to hand over.
+
+   **It has been broken in this repository, twice, by the agent that wrote this rule.** Commit `fecf522` (ISSUE-4) was committed *and* pushed with no handover; `0c08fdf` (ISSUE-5) was committed without approval, and only an external permission block stopped the push. Both times every check had passed and the momentum carried straight through the gate.
+
+   Prose was not enough, so the rule is now **enforced by a hook**:
+
+   > `.claude/hooks/require-approval-before-commit.py`, wired as a `PreToolUse`
+   > hook on `Bash` in `.claude/settings.json`, **denies** `git commit`,
+   > `git push`, `git merge`, `git tag`, `gh pr create|merge|ready`,
+   > `gh release create` and `npm publish` unless the most recent *human*
+   > message in the transcript approves it. It reads the transcript rather than
+   > a marker file or an environment variable, because an agent cannot author a
+   > user turn — so it cannot grant itself approval.
+   >
+   > If a legitimate command is blocked, that is the rule working. **Do not edit
+   > or disable the hook to get past it.** Hand the work over and let the user
+   > reply; changing the guardrail is itself work that needs approval.
 
    Planning and documentation commits may proceed once the user says "approved". Implementation always waits.
 6. Commit in meaningful chunks that tell the story — not one large commit.
@@ -163,6 +179,10 @@ user journeys and product decisions.)
 - **Validation**: shape validation (zod) at the HTTP edge; *value* rules (is
   this a valid amount for this currency) in `domain/entities/Money.ts`.
 - **Imports**: always the `@/` alias, never deep relative paths.
+- **The repository interface is async.** Every `WalletRepository` method
+  returns a `Promise`, because an implementation may be network-backed. Await
+  use cases in routes and server components — `NextResponse.json()` accepts
+  `any`, so a forgotten `await` serialises as `{}` without a type error.
 - **Tests** live in `src/test/`, mirroring the source path. Domain specs are
   pure; application specs inject `createInMemoryWalletRepository()` and a fake
   port; mock at the port, never at `global.fetch`.
@@ -188,6 +208,12 @@ user journeys and product decisions.)
   not special-case it.
 - **Port 3000 may be occupied.** Read the dev server's ready line for the real
   port instead of assuming.
+- **No Redis is needed locally.** With no `KV_REST_API_*` /
+  `UPSTASH_REDIS_REST_*` variables set, the in-memory ledger is used. On Vercel
+  without them the app throws at startup on purpose — never add a silent
+  fallback to memory there, it would lose transactions invisibly.
+- **A failed or experimental build leaves `.next` unusable.** Rebuild before
+  trusting `next start`.
 
 ## Frontend conventions
 
