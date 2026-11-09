@@ -2,7 +2,7 @@
 
 - **Issue:** https://github.com/Aries1711/coconut-labs-coding-test_international_wallet_transfer/issues/5
 - **Branch:** `development/feature/redis-persistence`
-- **PR:** pending
+- **PR:** https://github.com/Aries1711/coconut-labs-coding-test_international_wallet_transfer/pull/7
 - **Status:** awaiting review
 
 ## What was asked
@@ -59,4 +59,5 @@ string or an object. There is a test for each.
 
 ## Outcome
 
-Pending review and the owner creating the Upstash store in Vercel.
+On PR #7 as `0c08fdf`, awaiting manual review before merge. Deployment
+still needs the owner to create the Upstash store in Vercel.

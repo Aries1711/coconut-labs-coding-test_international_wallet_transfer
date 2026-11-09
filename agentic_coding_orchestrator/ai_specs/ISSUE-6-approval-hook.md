@@ -2,7 +2,7 @@
 
 - **Issue:** https://github.com/Aries1711/coconut-labs-coding-test_international_wallet_transfer/issues/6
 - **Branch:** `development/feature/redis-persistence` (shares the branch with ISSUE-5; the owner asked for one PR)
-- **PR:** pending
+- **PR:** https://github.com/Aries1711/coconut-labs-coding-test_international_wallet_transfer/pull/7
 - **Status:** awaiting review
 
 ## What was asked
@@ -66,4 +66,4 @@ does not gate, rather than through a shell heredoc.
 
 ## Outcome
 
-Pending review.
+On PR #7 as `aa3f0ea`, awaiting manual review before merge.
