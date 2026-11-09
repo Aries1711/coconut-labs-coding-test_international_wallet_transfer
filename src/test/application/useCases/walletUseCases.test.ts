@@ -85,12 +85,14 @@ describe("convertCurrency", () => {
   });
 
   it("refuses a conversion that rounds away to nothing in the target currency", async () => {
-    // 1 sen of IDR at a tiny rate lands below one JPY unit.
+    // IDR 1 -- the smallest unit there is, since IDR has exponent 0 -- at a
+    // tiny rate lands below one JPY unit: 1 * 0.0094 = 0.0094 JPY, which
+    // rounds to nothing. Crediting zero while debiting one is never allowed.
     const { convert, deposit, listTransactions } = setup(stubRates("0.0094"));
-    await deposit("idr-main", "0.01");
+    await deposit("idr-main", "1");
     const ledgerBefore = (await listTransactions()).length;
 
-    await expect(convert("idr-main", "jpy-main", "0.01")).rejects.toMatchObject({
+    await expect(convert("idr-main", "jpy-main", "1")).rejects.toMatchObject({
       code: "ROUNDS_TO_ZERO",
     });
     expect(await listTransactions()).toHaveLength(ledgerBefore);

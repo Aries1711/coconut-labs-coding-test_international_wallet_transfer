@@ -2,21 +2,46 @@ import { AppError } from "../errors";
 import type { Currency } from "./Currency";
 
 /**
- * Money is always handled as integer minor units (cents, sen, rupiah...).
+ * Money is always handled as integer minor units (cents, rupiah, yen...).
  * Floats appear in exactly one place: formatting for display.
+ *
+ * The minor-unit exponent is pinned here, not derived from the runtime -- see
+ * MINOR_UNIT_EXPONENT below for why that distinction is load-bearing.
  */
 
-const decimalsCache = new Map<Currency, number>();
+/**
+ * Minor-unit exponents, pinned deliberately rather than read from `Intl`.
+ *
+ * The exponent decides what a stored `amountMinor` integer *means*. `Intl`'s
+ * answer comes from the CLDR data bundled with the Node build, and CLDR moved
+ * IDR from 2 fraction digits to 0 -- so local Node 22.2.0 says 2 while the
+ * deployed runtime says 0. Each environment was self-consistent and therefore
+ * looked correct alone, but the same ledger row read by the other runtime was
+ * off by 100x. See issue #10.
+ *
+ * Deriving a *rendering* from a library is fine; the library improving is a
+ * feature. Deriving the *meaning of persisted data* from one is not, because
+ * the library can change underneath data that was already written.
+ *
+ * `Record<Currency, number>` makes the table total: adding a currency to
+ * SUPPORTED_CURRENCIES without an exponent here is a compile error rather than
+ * a silent `undefined` propagating into money arithmetic.
+ */
+const MINOR_UNIT_EXPONENT: Record<Currency, number> = {
+  USD: 2,
+  EUR: 2,
+  GBP: 2,
+  JPY: 0,
+  SGD: 2,
+  AUD: 2,
+  // Rupiah are not subdivided in practice -- sen left circulation decades ago.
+  // 0 also matches the deployed runtime, so the live ledger needs no migration.
+  IDR: 0,
+};
 
-/** Minor-unit exponent for a currency, from the Intl database (JPY=0, USD=2). */
+/** Minor-unit exponent for a currency (JPY=0, USD=2, IDR=0). */
 export function decimalsFor(currency: Currency): number {
-  const cached = decimalsCache.get(currency);
-  if (cached !== undefined) return cached;
-  const decimals =
-    new Intl.NumberFormat("en-US", { style: "currency", currency })
-      .resolvedOptions().maximumFractionDigits ?? 2;
-  decimalsCache.set(currency, decimals);
-  return decimals;
+  return MINOR_UNIT_EXPONENT[currency];
 }
 
 const AMOUNT_PATTERN = /^\d+(\.\d+)?$/;
