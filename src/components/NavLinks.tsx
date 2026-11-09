@@ -17,7 +17,7 @@ export default function NavLinks() {
   const pathname = usePathname();
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-1 py-2">
       {TABS.map((tab) => {
         const active = isActive(pathname, tab.href);
         return (
@@ -27,8 +27,8 @@ export default function NavLinks() {
             aria-current={active ? "page" : undefined}
             className={
               active
-                ? "rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white"
-                : "rounded-md px-3 py-1.5 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                ? "whitespace-nowrap rounded-md bg-slate-900 px-3 py-2 text-sm font-medium text-white"
+                : "whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900"
             }
           >
             {tab.label}
