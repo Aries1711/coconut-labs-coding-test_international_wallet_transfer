@@ -8,6 +8,10 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
   test: {
-    include: ["src/test/**/*.test.ts"],
+    include: ["src/test/**/*.test.{ts,tsx}"],
+    // Node for the domain/application/infrastructure specs; jsdom only for
+    // component specs, which need a DOM to click on.
+    environmentMatchGlobs: [["src/test/components/**", "jsdom"]],
+    setupFiles: ["src/test/setup.ts"],
   },
 });
