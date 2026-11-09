@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { WalletView } from "@/domain/entities/Wallet";
+import Listbox from "./Listbox";
 
 type Props = { wallets: WalletView[] };
 
@@ -67,35 +68,35 @@ const inputClass =
 const buttonClass =
   "rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-400";
 
+/**
+ * Wallet picker. Uses the shared Listbox rather than a native <select> so the
+ * open panel is anchored to its trigger and uses the app's type scale on every
+ * viewport -- see the comment in Listbox.tsx.
+ */
 function WalletSelect({
-  name,
   label,
   wallets,
   value,
   onChange,
+  disabled,
 }: {
-  name: string;
   label: string;
   wallets: WalletView[];
   value: string;
   onChange: (value: string) => void;
+  disabled?: boolean;
 }) {
   return (
-    <label className="block text-sm">
-      <span className="mb-1 block text-slate-600">{label}</span>
-      <select
-        name={name}
-        className={inputClass}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        {wallets.map((wallet) => (
-          <option key={wallet.id} value={wallet.id}>
-            {wallet.label} — {wallet.balanceFormatted}
-          </option>
-        ))}
-      </select>
-    </label>
+    <Listbox
+      label={label}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      options={wallets.map((wallet) => ({
+        value: wallet.id,
+        label: `${wallet.label} — ${wallet.balanceFormatted}`,
+      }))}
+    />
   );
 }
 
@@ -147,11 +148,11 @@ function SingleWalletForm({
         }}
       >
         <WalletSelect
-          name="walletId"
           label="Wallet"
           wallets={wallets}
           value={walletId}
           onChange={setWalletId}
+          disabled={pending}
         />
         <AmountInput value={amount} onChange={setAmount} currency={currency} />
         <button type="submit" className={buttonClass} disabled={pending}>
@@ -230,18 +231,18 @@ function TwoWalletForm({
         }}
       >
         <WalletSelect
-          name="fromWalletId"
           label="From"
           wallets={wallets}
           value={fromWalletId}
           onChange={setFromWalletId}
+          disabled={pending}
         />
         <WalletSelect
-          name="toWalletId"
           label="To"
           wallets={wallets}
           value={toWalletId}
           onChange={setToWalletId}
+          disabled={pending}
         />
         <AmountInput value={amount} onChange={setAmount} currency={from?.currency} />
         <p className="text-xs text-slate-500">{hint}</p>
