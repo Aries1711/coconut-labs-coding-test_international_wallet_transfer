@@ -2,18 +2,54 @@
 
 A simulated multi-currency digital wallet: one user, several wallets, deposits,
 withdrawals, same-currency transfers and cross-currency conversions at live
-mid-market rates. No auth, no payments, no database.
+mid-market rates. No auth and no payments. Nothing to install to run it
+locally; the deployed version keeps its ledger in Redis.
+
+**Live:** <https://coconut-labs-coding-test-internatio.vercel.app/>
 
 ## Run it
 
+Node 20.19+ or 22+ (built and verified on Node 22.2.0). Nothing else — **no
+database, no Redis, no API key and no account anywhere** are needed to run this
+locally.
+
 ```bash
+git clone https://github.com/Aries1711/coconut-labs-coding-test_international_wallet_transfer.git
+cd coconut-labs-coding-test_international_wallet_transfer
 npm install
-npm run dev          # http://localhost:3000
-npm test             # Vitest: money math + wallet service (Frankfurter mocked)
-npm run typecheck    # tsc --noEmit
+cp .env.example .env.local   # optional — every variable in it is optional locally
+npm run dev
 ```
 
-Node 20.19+ or 22+ (the repo was built and verified on Node 22.2.0).
+Open <http://localhost:3000>. Six wallets are already seeded, so there is
+something to deposit into straight away. (If port 3000 is taken, Next picks
+another and prints it — read the `Local:` line, not the default.)
+
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Dev server, hot reload |
+| `npm test` | Vitest: money math, use cases, the Redis adapter and DOM behaviour (Frankfurter mocked) |
+| `npm run typecheck` | `tsc --noEmit` |
+| `npm run lint` | ESLint |
+| `npm run build` | Production build |
+| `npm start` | Serve that build — run `npm run build` first |
+
+One thing does reach the network at runtime: the exchange rate. `/api/rates`
+and `/api/conversions` call [Frankfurter](https://frankfurter.dev), which needs
+no key or account. With no connection, conversions return
+`503 RATE_UNAVAILABLE` rather than inventing a rate — and `npm test` still
+passes, because the tests mock it.
+
+### Where the ledger lives
+
+The app picks its storage from the environment, in one place
+([`src/infrastructure/container.ts`](src/infrastructure/container.ts)):
+
+| Redis variables set? | Store | What that means |
+| --- | --- | --- |
+| No — the default locally | In memory | Zero setup; the ledger resets when the server restarts |
+| Yes | Upstash Redis | Survives restarts; the same store the deployment uses |
+| No, but running on Vercel | — | **Startup throws, deliberately** — see [Deploying](#deploying) |
 
 ## What you can do
 
@@ -50,29 +86,96 @@ server. Errors share one shape:
 `CURRENCY_MISMATCH`, `CURRENCY_MATCH_FOR_CONVERSION`, `INSUFFICIENT_FUNDS`,
 `ROUNDS_TO_ZERO`) · `503` `RATE_UNAVAILABLE`.
 
+## Environment variables
+
+Every variable the code reads is declared in [`.env.example`](.env.example),
+with a comment on where each value comes from. Copy it and fill in only what
+you need:
+
+```bash
+cp .env.example .env.local
+```
+
+`.env.local` is gitignored; `.env` works too. `.env.example` is committed and
+holds variable **names** only, never values.
+
+| Variable | Required | Who sets it | When it is absent |
+| --- | --- | --- | --- |
+| `KV_REST_API_URL` | In production | Vercel, once an Upstash store is connected | Falls through to `UPSTASH_REDIS_REST_URL` |
+| `KV_REST_API_TOKEN` | In production | Vercel, same | Falls through to `UPSTASH_REDIS_REST_TOKEN` |
+| `UPSTASH_REDIS_REST_URL` | Alternative to the above | You, from the Upstash console | In-memory ledger |
+| `UPSTASH_REDIS_REST_TOKEN` | Alternative to the above | You, same | In-memory ledger |
+| `VERCEL` | **Never set this yourself** | The Vercel build and runtime | Local behaviour: a missing Redis config is fine |
+| `VERCEL_TOKEN` | Only for CLI deploys | You, from Vercel → Account → Tokens | Use the dashboard integration instead |
+
+Set **one** of the two pairs. `KV_REST_API_*` is read first; both name the same
+Upstash service, and two names exist only because the two ways of provisioning
+it differ.
+
+**The adapter speaks Upstash's HTTP REST API, not the Redis wire protocol.** A
+local `redis-server` or the `redis` Docker image cannot stand in for it — they
+do not speak HTTP. Use a free Upstash store, or leave the variables unset and
+develop against the in-memory ledger.
+
 ## Deploying
 
 Hosted on **Vercel**, with the ledger in **Upstash Redis**.
 
-1. Vercel dashboard → **Storage** → **Create Database** → **Upstash Redis**
-   (free tier) → connect it to the project. `KV_REST_API_URL` and
-   `KV_REST_API_TOKEN` are injected for you.
-2. **Add New** → **Project** → import this repository. Next.js is detected; no
-   build settings to change.
-3. Deploy. Pushes to `main` deploy automatically.
+### 1. Create the Redis store — before the first deploy
 
-A direct Upstash account also works (`UPSTASH_REDIS_REST_URL` /
-`UPSTASH_REDIS_REST_TOKEN`).
+1. Vercel dashboard → the project → **Storage** → **Create Database** →
+   **Upstash Redis** → free tier.
+2. Connect it to the project. `KV_REST_API_URL` and `KV_REST_API_TOKEN` are
+   injected into every environment automatically — you never copy them by hand.
 
-**Locally you need no Redis** — with no variables set the in-memory ledger is
-used, so `npm run dev` and `npm test` stay dependency-free. On Vercel without
-Redis configured the app throws at startup on purpose: serverless gives no
-instance affinity, so an in-memory ledger would silently lose transactions
-between requests, and a deploy that looks healthy while losing money is worse
-than one that refuses to start.
+**The order matters: a deploy with no Redis configured fails on purpose**, at
+build time. Next's headline is generic and names a route rather than the cause,
+so read one line further down:
 
-Static hosting (GitHub Pages) cannot serve this app at all — the API routes
-have nowhere to run. See
+```
+> Build error occurred
+Error: Failed to collect page data for /api/transfers
+  [cause]: Error: Running on Vercel without Redis configured. Set
+  KV_REST_API_URL and KV_REST_API_TOKEN (or the UPSTASH_REDIS_REST_*
+  equivalents): the in-memory ledger cannot survive across serverless instances.
+```
+
+That refusal is deliberate. Vercel runs the app as serverless functions with no
+instance affinity and recycles idle ones, so an in-memory ledger would serve
+one request from one instance's memory and the next from another's — a deposit
+would appear to vanish. A deployment that looks healthy while losing money is
+worse than one that refuses to start.
+
+### 2a. Deploy from the dashboard (recommended)
+
+1. **Add New** → **Project** → import this repository.
+2. Next.js is auto-detected — no build command, output directory or install
+   command to change.
+3. **Deploy.** Every later merge to `main` deploys itself, and pull requests
+   get their own preview URLs.
+
+### 2b. Or deploy from the command line
+
+Needs `VERCEL_TOKEN` in `.env.local` (Vercel → Account → Tokens):
+
+```bash
+set -a; . ./.env.local; set +a          # load it into this shell
+npx vercel link --yes --token "$VERCEL_TOKEN"
+npx vercel --prod --token "$VERCEL_TOKEN"
+```
+
+To point local development at the deployed store rather than the in-memory one:
+
+```bash
+npx vercel env pull .env.local          # overwrites it with the real values
+npm run dev
+```
+
+### Not GitHub Pages
+
+Static hosting cannot serve this app at all — all nine API routes are
+server-side, and `output: "export"` fails on every one of them. The options
+were measured rather than assumed; see
 [`ai_docs/deployment.md`](agentic_coding_orchestrator/ai_docs/deployment.md).
 
 ## Design decisions
@@ -100,8 +203,10 @@ balances are real `DEPOSIT` entries, never untracked state.
 
 **Storage sits behind an interface.** `WalletRepository` exposes one write
 (`append`). The in-memory implementation keeps the store on `globalThis` so the
-ledger survives Next.js hot reloads; a file or SQL adapter can replace it without
-touching the service layer.
+ledger survives Next.js hot reloads. The Redis adapter, added later, tested that
+claim rather than asserting it: swapping the store touched `infrastructure/` and
+the composition root only, and no file under `domain/` or `application/` imports
+or even names Redis.
 
 **All business logic is server-side.** The use cases in
 `src/application/useCases/` own every rule. Route handlers validate shapes with zod and map errors; the client posts
@@ -129,13 +234,30 @@ writing.
 - **Daily mid-market rates.** Frankfurter publishes ECB reference rates once per
   working day, so a conversion made at 02:00 uses the previous close. No spread
   or fees are modelled, which no real provider would do.
-- **Concurrency is only as safe as one Node process.** Read-check-append is
-  effectively atomic here because a single process interleaves requests at
-  `await` points, and the one `await` inside `convert` is followed by a
-  re-check. A real deployment needs a transactional store or a per-wallet lock.
-- **CLDR gives IDR two fraction digits**, so IDR balances are held in sen
-  (`"1"` IDR → 100 minor units). That follows the spec's rule of taking decimals
-  from `Intl`, but it is not how Indonesian amounts are written in practice.
+- **A currency's minor-unit exponent comes from the runtime, and runtimes
+  disagree.** `decimalsFor` reads
+  `Intl.NumberFormat(...).resolvedOptions().maximumFractionDigits`, as the brief
+  requires. But that value depends on the CLDR data bundled with the Node build,
+  and CLDR changed IDR from 2 fraction digits to 0. Measured, not assumed:
+
+  | Runtime | `decimalsFor("IDR")` | `balanceMinor: 1811400` renders as |
+  | --- | --- | --- |
+  | Local, Node 22.2.0 | `2` | `IDR 18,114.00` |
+  | Vercel production | `0` | `IDR 1,811,400` |
+
+  Each environment is internally consistent, so both read correctly on their
+  own. The hazard is a **shared** ledger: `amountMinor` is an integer whose
+  meaning depends on the exponent in force when it was written, so the same
+  stored row is off by 100× when read by the other runtime. This was harmless
+  while the ledger lived in one process, and became real the moment it moved to
+  Redis — including for the `vercel env pull` workflow above, which deliberately
+  points local development at the production store.
+
+  **The fix is to stop deriving stored money from a library version**: pin the
+  exponent per supported currency in a constant table, keep `Intl` for display
+  only, and record the exponent on each ledger entry so old rows stay readable
+  if the table ever changes. Not done here — it reverses an explicit
+  instruction in the brief, so it is the owner's call.
 - **Tailwind is pinned to v3.** Tailwind v4's compiler `require()`s an ESM
   module, which fails on Node 22.2 (it needs 22.12+); v3 + PostCSS builds on the
   toolchain this was developed against.
