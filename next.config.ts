@@ -1,17 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
-  turbopack: {
-    rules: {
-      "*.css": {
-        loaders: ["@tailwindcss/turbopack"],
-        as: "*.css",
-      },
-    },
-  },
+  // The ledger lives in memory and every page reads it per request, so
+  // Cache Components / partial prefetching are off: pages render dynamically.
+  agentRules: false,
 };
 
 export default nextConfig;
