@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AppError, toErrorResponse } from "../errors";
+import { AppError } from "@/domain/errors";
+import { toErrorResponse } from "@/infrastructure/http/errorResponse";
 
 // toErrorResponse logs unhandled errors via console.error by design; silence
 // that expected noise here rather than letting it clutter test output.

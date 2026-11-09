@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { toErrorResponse } from "@/lib/errors";
-import { getTransaction } from "@/lib/service/wallet";
+import { getTransaction } from "@/infrastructure/container";
+import { toErrorResponse } from "@/infrastructure/http/errorResponse";
 
 export async function GET(
   _request: Request,

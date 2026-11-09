@@ -78,8 +78,8 @@ balances are real `DEPOSIT` entries, never untracked state.
 ledger survives Next.js hot reloads; a file or SQL adapter can replace it without
 touching the service layer.
 
-**All business logic is server-side.** `src/lib/service/wallet.ts` owns every
-rule. Route handlers validate shapes with zod and map errors; the client posts
+**All business logic is server-side.** The use cases in
+`src/application/useCases/` own every rule. Route handlers validate shapes with zod and map errors; the client posts
 JSON and renders what comes back. The convert form displays the quoted rate but
 never computes a converted amount.
 
@@ -127,19 +127,28 @@ writing.
 
 ## Layout
 
+Layered (clean) architecture; dependencies point inward only
+(`app → infrastructure → application → domain`). The full convention is in
+[`agentic_coding_orchestrator/ai_docs/architecture.md`](agentic_coding_orchestrator/ai_docs/architecture.md).
+
 ```
 src/
-  app/
+  app/                        Next.js routing + HTTP edge (no business logic)
     page.tsx                  balances + action forms
     transactions/             history, detail
     api/                      9 route handlers (the whole API surface)
-  components/WalletActions.tsx  client forms (fetch + pending state only)
-  lib/
-    money.ts                  decimals, parsing, half-up conversion
-    rates.ts                  Frankfurter v2 client + 60s cache
-    service/wallet.ts         every business rule
-    repo/WalletRepository.ts  storage boundary
-    repo/memory.ts            in-memory, globalThis-backed, seeded
-    errors.ts validation.ts types.ts currencies.ts
-    test/                     Vitest specs, mirroring the layout above
+  components/                 client components (fetch + render only)
+  domain/                     the rules; imports nothing outward
+    entities/                 Currency, Money, Wallet, Transaction, ExchangeRate
+    repositories/             WalletRepository, ExchangeRateRepository (interfaces)
+    errors.ts                 AppError + ErrorCode
+  application/
+    useCases/                 depositFunds, withdrawFunds, transferFunds,
+                              convertCurrency, listWallets, getWallet,
+                              listTransactions, getTransaction, getExchangeRate
+  infrastructure/
+    repositories/             InMemoryWalletRepository, FrankfurterExchangeRateRepository
+    http/                     errorResponse, requestValidation (zod)
+    container.ts              composition root: the only place implementations are chosen
+  test/                       Vitest specs, mirroring the layout above
 ```

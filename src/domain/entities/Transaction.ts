@@ -1,16 +1,4 @@
-import type { Currency } from "./currencies";
-
-export type Wallet = {
-  id: string;
-  label: string;
-  currency: Currency;
-};
-
-/** A wallet plus its balance derived from the ledger. */
-export type WalletView = Wallet & {
-  balanceMinor: number;
-  balanceFormatted: string;
-};
+import type { Currency } from "./Currency";
 
 export type TransactionType = "DEPOSIT" | "WITHDRAWAL" | "TRANSFER" | "CONVERSION";
 
@@ -35,3 +23,21 @@ export type Transaction = {
 };
 
 export type NewTransaction = Omit<Transaction, "id" | "createdAt">;
+
+/** Signed effect of one ledger entry on one wallet. */
+export function deltaFor(tx: Transaction, walletId: string): number {
+  let delta = 0;
+  if (tx.fromWalletId === walletId) delta -= tx.amountMinor;
+  if (tx.toWalletId === walletId) {
+    delta += tx.type === "CONVERSION" ? (tx.targetAmountMinor ?? 0) : tx.amountMinor;
+  }
+  return delta;
+}
+
+/**
+ * A wallet's balance is a fold over the ledger, never a stored number. This is
+ * the single definition of "balance" in the system.
+ */
+export function balanceOf(transactions: readonly Transaction[], walletId: string): number {
+  return transactions.reduce((total, tx) => total + deltaFor(tx, walletId), 0);
+}

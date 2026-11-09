@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { toErrorResponse } from "@/lib/errors";
-import { convert } from "@/lib/service/wallet";
-import { parseBody, twoWalletSchema } from "@/lib/validation";
+import { convertCurrency } from "@/infrastructure/container";
+import { toErrorResponse } from "@/infrastructure/http/errorResponse";
+import { parseBody, twoWalletSchema } from "@/infrastructure/http/requestValidation";
 
 export async function POST(request: Request) {
   try {
     const { fromWalletId, toWalletId, amount } = await parseBody(request, twoWalletSchema);
-    const transaction = await convert(fromWalletId, toWalletId, amount);
+    const transaction = await convertCurrency(fromWalletId, toWalletId, amount);
     return NextResponse.json({ transaction }, { status: 201 });
   } catch (error) {
     return toErrorResponse(error);

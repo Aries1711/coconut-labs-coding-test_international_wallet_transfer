@@ -9,7 +9,7 @@ import {
   useTransition,
   type KeyboardEvent,
 } from "react";
-import type { WalletView } from "@/lib/types";
+import type { WalletView } from "@/domain/entities/Wallet";
 
 type Props = {
   wallets: WalletView[];

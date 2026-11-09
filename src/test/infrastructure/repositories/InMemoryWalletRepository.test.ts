@@ -1,5 +1,13 @@
-import { describe, expect, it } from "vitest";
-import { memoryWalletRepository as repo } from "../../repo/memory";
+import { beforeEach, describe, expect, it } from "vitest";
+import type { WalletRepository } from "@/domain/repositories/WalletRepository";
+import { createInMemoryWalletRepository } from "@/infrastructure/repositories/InMemoryWalletRepository";
+
+// The factory gives every test its own freshly seeded ledger, so no test
+// depends on what another one appended.
+let repo: WalletRepository;
+beforeEach(() => {
+  repo = createInMemoryWalletRepository();
+});
 
 describe("memoryWalletRepository: seeded state", () => {
   it("seeds exactly the six documented wallets", () => {

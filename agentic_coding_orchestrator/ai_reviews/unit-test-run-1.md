@@ -1,23 +1,25 @@
 # Unit test run 1 — money, validation, rates, repo, service
 
 `npm test` (Vitest 3.2.4, Node 22.2.0). **49/49 passed, 0 failed.** Six files,
-one per module in `src/lib/`: the business-logic layer, deliberately separated
+one per module of the business-logic layers, deliberately separated
 from routes and components so it is unit-testable without a server or a browser.
 
 ```
-src/lib/test/repo/memory.test.ts        7 tests
-src/lib/test/rates.test.ts              6 tests
-src/lib/test/errors.test.ts             3 tests
-src/lib/test/money.test.ts             12 tests
-src/lib/test/service/wallet.test.ts    14 tests
-src/lib/test/validation.test.ts         7 tests
-                                        -- 
-                                        49 tests, 4.2s
+src/test/infrastructure/repositories/InMemoryWalletRepository.test.ts   7
+src/test/infrastructure/repositories/FrankfurterExchangeRateRepository.test.ts   6
+src/test/infrastructure/http/errorResponse.test.ts                      3
+src/test/domain/Money.test.ts                                          12
+src/test/application/useCases/walletUseCases.test.ts                   15
+src/test/infrastructure/http/requestValidation.test.ts                  7
+                                                                       --
+                                                                       50
 ```
 
-Test files live under `src/lib/test/`, mirroring the module layout of the code
-they test (`src/lib/test/repo/memory.test.ts` tests `src/lib/repo/memory.ts`,
-and so on) rather than sitting next to the source files.
+Test files live under `src/test/`, mirroring the layout of the code they test.
+Counts updated after the layered-architecture refactor (see
+`../ai_docs/architecture.md`): the suite grew to 50 because the use-case layer
+now covers `ROUNDS_TO_ZERO` directly, and Frankfurter is faked at the
+`ExchangeRateRepository` port instead of by stubbing `global.fetch`.
 
 ## Why these six files, and nothing else
 

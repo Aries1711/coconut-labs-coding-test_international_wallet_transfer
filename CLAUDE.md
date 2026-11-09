@@ -82,3 +82,15 @@ Keep the UI plain and functional. After each step, tell me in one line what's do
 
 ## Start now
 Save CLAUDE.md, then begin Phase 1.
+
+---
+
+## Architecture (added after the timed test, by the project owner's request)
+
+The `src/` tree follows a layered (clean) architecture: `domain` /
+`application` / `infrastructure`, with `app` and `components` as the edge.
+
+**Before adding or changing a feature, read
+`agentic_coding_orchestrator/ai_docs/architecture.md` and follow it.** It
+defines where each kind of file goes, the inward-only dependency rule, the
+use-case factory pattern, and the testing conventions.

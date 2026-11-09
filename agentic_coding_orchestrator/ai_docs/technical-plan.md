@@ -1,5 +1,12 @@
 # Technical plan — multi-currency wallet
 
+> **Superseded in part.** This records the plan as approved during the timed
+> test, when the code lived under `src/lib/`. The folder structure was later
+> refactored to a layered architecture at the owner's request — see
+> `architecture.md`, which is the convention to follow now. Everything below
+> about money handling, the ledger and the rate policy still holds; only the
+> file layout changed.
+
 Approved before implementation; this is the plan as agreed, with the one contract
 change that implementation forced noted at the end.
 

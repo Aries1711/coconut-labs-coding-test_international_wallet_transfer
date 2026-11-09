@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { toErrorResponse } from "@/lib/errors";
-import { listWallets } from "@/lib/service/wallet";
+import { listWallets } from "@/infrastructure/container";
+import { toErrorResponse } from "@/infrastructure/http/errorResponse";
 
 export async function GET() {
   try {

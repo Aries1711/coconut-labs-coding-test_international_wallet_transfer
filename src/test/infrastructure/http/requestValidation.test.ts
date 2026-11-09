@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { AppError } from "../errors";
-import { currencySchema, parseBody, singleWalletSchema, twoWalletSchema } from "../validation";
+import { AppError } from "@/domain/errors";
+import { currencySchema, parseBody, singleWalletSchema, twoWalletSchema } from "@/infrastructure/http/requestValidation";
 
 function jsonRequest(body: unknown): Request {
   return new Request("http://localhost/api/test", {

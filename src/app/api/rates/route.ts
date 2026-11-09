@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { AppError, toErrorResponse } from "@/lib/errors";
-import { getRate } from "@/lib/rates";
-import { currencySchema } from "@/lib/validation";
+import { AppError } from "@/domain/errors";
+import { getExchangeRate } from "@/infrastructure/container";
+import { toErrorResponse } from "@/infrastructure/http/errorResponse";
+import { currencySchema } from "@/infrastructure/http/requestValidation";
 
 /** Rate preview for the convert form. Does not touch the ledger. */
 export async function GET(request: Request) {
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
         "`from` and `to` must both be supported currency codes.",
       );
     }
-    return NextResponse.json(await getRate(from.data, to.data));
+    return NextResponse.json(await getExchangeRate(from.data, to.data));
   } catch (error) {
     return toErrorResponse(error);
   }

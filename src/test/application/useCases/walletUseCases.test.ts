@@ -1,36 +1,49 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { AppError } from "../../errors";
-import {
-  balanceMinor,
-  convert,
-  deposit,
-  getTransaction,
-  getWallet,
-  listTransactions,
-  listWallets,
-  transfer,
-  withdraw,
-} from "../../service/wallet";
+import { describe, expect, it } from "vitest";
+import { AppError } from "@/domain/errors";
+import type { ExchangeRateRepository } from "@/domain/repositories/ExchangeRateRepository";
+import { makeConvertCurrency } from "@/application/useCases/convertCurrency";
+import { makeDepositFunds } from "@/application/useCases/depositFunds";
+import { makeGetTransaction } from "@/application/useCases/getTransaction";
+import { makeGetBalanceMinor, makeGetWallet } from "@/application/useCases/getWallet";
+import { makeListTransactions } from "@/application/useCases/listTransactions";
+import { makeListWallets } from "@/application/useCases/listWallets";
+import { makeTransferFunds } from "@/application/useCases/transferFunds";
+import { makeWithdrawFunds } from "@/application/useCases/withdrawFunds";
+import { createInMemoryWalletRepository } from "@/infrastructure/repositories/InMemoryWalletRepository";
 
-function mockFrankfurter(rate: number, date = "2026-11-09") {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async () =>
-      new Response(JSON.stringify({ date, base: "USD", quote: "JPY", rate }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      }),
-    ),
-  );
+/** Frankfurter is mocked at the port, so no network or fetch stub is involved. */
+function stubRates(rate: string, date = "2026-11-09"): ExchangeRateRepository {
+  return { getRate: async (from, to) => ({ from, to, rate, date }) };
 }
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
+function unavailableRates(): ExchangeRateRepository {
+  return {
+    getRate: async () => {
+      throw new AppError("RATE_UNAVAILABLE", 503, "Rate provider is down.");
+    },
+  };
+}
 
-describe("convert", () => {
+/** A fresh, independently seeded ledger per test. */
+function setup(rates: ExchangeRateRepository = stubRates("158.26")) {
+  const wallets = createInMemoryWalletRepository();
+  return {
+    wallets,
+    balanceMinor: makeGetBalanceMinor({ wallets }),
+    listWallets: makeListWallets({ wallets }),
+    getWallet: makeGetWallet({ wallets }),
+    deposit: makeDepositFunds({ wallets }),
+    withdraw: makeWithdrawFunds({ wallets }),
+    transfer: makeTransferFunds({ wallets }),
+    convert: makeConvertCurrency({ wallets, rates }),
+    listTransactions: makeListTransactions({ wallets }),
+    getTransaction: makeGetTransaction({ wallets }),
+  };
+}
+
+describe("convertCurrency", () => {
   it("moves both legs in one ledger entry and stores the rate", async () => {
-    mockFrankfurter(158.26);
+    const { convert, balanceMinor } = setup();
     const usdBefore = balanceMinor("usd-main");
     const jpyBefore = balanceMinor("jpy-main");
 
@@ -45,12 +58,11 @@ describe("convert", () => {
     expect(balanceMinor("jpy-main")).toBe(jpyBefore + 1583);
   });
 
-  it("records nothing when Frankfurter is unavailable", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("socket hang up"); }));
+  it("records nothing when the rate provider is unavailable", async () => {
+    const { convert, balanceMinor, listTransactions } = setup(unavailableRates());
     const ledgerBefore = listTransactions().length;
     const usdBefore = balanceMinor("usd-main");
 
-    // A pair not already in the 60s cache, so the failing fetch is reached.
     await expect(convert("usd-main", "gbp-main", "10.00")).rejects.toMatchObject({
       code: "RATE_UNAVAILABLE",
       status: 503,
@@ -60,19 +72,34 @@ describe("convert", () => {
   });
 
   it("rejects a same-currency pair and an overdraft without writing", async () => {
-    mockFrankfurter(158.26);
+    const { convert, listTransactions } = setup();
     const ledgerBefore = listTransactions().length;
 
-    await expect(convert("usd-main", "usd-savings", "1.00")).rejects.toBeInstanceOf(AppError);
+    await expect(convert("usd-main", "usd-savings", "1.00")).rejects.toBeInstanceOf(
+      AppError,
+    );
     await expect(convert("usd-main", "jpy-main", "9999999.00")).rejects.toMatchObject({
       code: "INSUFFICIENT_FUNDS",
     });
     expect(listTransactions()).toHaveLength(ledgerBefore);
   });
+
+  it("refuses a conversion that rounds away to nothing in the target currency", async () => {
+    // 1 sen of IDR at a tiny rate lands below one JPY unit.
+    const { convert, deposit, listTransactions } = setup(stubRates("0.0094"));
+    deposit("idr-main", "0.01");
+    const ledgerBefore = listTransactions().length;
+
+    await expect(convert("idr-main", "jpy-main", "0.01")).rejects.toMatchObject({
+      code: "ROUNDS_TO_ZERO",
+    });
+    expect(listTransactions()).toHaveLength(ledgerBefore);
+  });
 });
 
-describe("transfer", () => {
+describe("transferFunds", () => {
   it("moves funds 1:1 between same-currency wallets", () => {
+    const { transfer, balanceMinor } = setup();
     const fromBefore = balanceMinor("usd-main");
     const toBefore = balanceMinor("usd-savings");
 
@@ -84,14 +111,16 @@ describe("transfer", () => {
   });
 
   it("refuses a cross-currency pair, the same wallet, and unknown wallets", () => {
+    const { transfer } = setup();
     expect(() => transfer("usd-main", "eur-main", "1.00")).toThrowError(AppError);
     expect(() => transfer("usd-main", "usd-main", "1.00")).toThrowError(AppError);
     expect(() => transfer("ghost", "usd-main", "1.00")).toThrowError(AppError);
   });
 });
 
-describe("deposit", () => {
+describe("depositFunds", () => {
   it("credits the wallet and appends a DEPOSIT entry", () => {
+    const { deposit, balanceMinor } = setup();
     const before = balanceMinor("eur-main");
 
     const tx = deposit("eur-main", "12.34");
@@ -104,7 +133,9 @@ describe("deposit", () => {
   });
 
   it("rejects an unknown wallet and a malformed amount without writing", () => {
+    const { deposit, listTransactions } = setup();
     const ledgerBefore = listTransactions().length;
+
     expect(() => deposit("ghost", "1.00")).toThrowError(
       expect.objectContaining({ code: "WALLET_NOT_FOUND" }) as unknown as Error,
     );
@@ -115,8 +146,9 @@ describe("deposit", () => {
   });
 });
 
-describe("withdraw", () => {
+describe("withdrawFunds", () => {
   it("debits the wallet and appends a WITHDRAWAL entry", () => {
+    const { withdraw, balanceMinor } = setup();
     const before = balanceMinor("usd-savings");
 
     const tx = withdraw("usd-savings", "15.00");
@@ -129,7 +161,8 @@ describe("withdraw", () => {
   });
 
   it("refuses to overdraw and writes nothing", () => {
-    const before = balanceMinor("gbp-main"); // seeded at zero, untouched elsewhere
+    const { withdraw, balanceMinor, listTransactions } = setup();
+    const before = balanceMinor("gbp-main"); // seeded at zero
     const ledgerBefore = listTransactions().length;
 
     expect(() => withdraw("gbp-main", "0.01")).toThrowError(
@@ -142,6 +175,7 @@ describe("withdraw", () => {
 
 describe("listWallets / getWallet", () => {
   it("derives every wallet's balance from the ledger", () => {
+    const { listWallets, balanceMinor } = setup();
     const wallets = listWallets();
     const usdMain = wallets.find((wallet) => wallet.id === "usd-main");
 
@@ -151,15 +185,21 @@ describe("listWallets / getWallet", () => {
   });
 
   it("404s for an unknown wallet", () => {
+    const { getWallet } = setup();
     expect(() => getWallet("ghost")).toThrowError(
-      expect.objectContaining({ code: "WALLET_NOT_FOUND", status: 404 }) as unknown as Error,
+      expect.objectContaining({
+        code: "WALLET_NOT_FOUND",
+        status: 404,
+      }) as unknown as Error,
     );
   });
 });
 
 describe("listTransactions / getTransaction", () => {
   it("filters to only the entries touching one wallet", () => {
+    const { listTransactions } = setup();
     const filtered = listTransactions("jpy-main");
+
     expect(filtered.length).toBeGreaterThan(0);
     for (const tx of filtered) {
       expect([tx.fromWalletId, tx.toWalletId]).toContain("jpy-main");
@@ -167,15 +207,20 @@ describe("listTransactions / getTransaction", () => {
   });
 
   it("404s listing by an unknown wallet, and fetching an unknown transaction", () => {
+    const { listTransactions, getTransaction } = setup();
     expect(() => listTransactions("ghost")).toThrowError(
       expect.objectContaining({ code: "WALLET_NOT_FOUND" }) as unknown as Error,
     );
     expect(() => getTransaction("does-not-exist")).toThrowError(
-      expect.objectContaining({ code: "TRANSACTION_NOT_FOUND", status: 404 }) as unknown as Error,
+      expect.objectContaining({
+        code: "TRANSACTION_NOT_FOUND",
+        status: 404,
+      }) as unknown as Error,
     );
   });
 
   it("round-trips a transaction by id", () => {
+    const { deposit, getTransaction } = setup();
     const tx = deposit("gbp-main", "1.00");
     expect(getTransaction(tx.id)).toEqual(tx);
   });

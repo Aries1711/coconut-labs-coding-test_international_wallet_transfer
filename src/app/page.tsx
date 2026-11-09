@@ -1,5 +1,5 @@
 import WalletActions from "@/components/WalletActions";
-import { listWallets } from "@/lib/service/wallet";
+import { listWallets } from "@/infrastructure/container";
 
 /** Balances are derived per request from the ledger, so never cache this page. */
 export const dynamic = "force-dynamic";

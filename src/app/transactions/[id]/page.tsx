@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AppError } from "@/lib/errors";
-import { formatMinor } from "@/lib/money";
-import { getTransaction, listWallets } from "@/lib/service/wallet";
-import type { Transaction } from "@/lib/types";
+import { formatMinor } from "@/domain/entities/Money";
+import type { Transaction } from "@/domain/entities/Transaction";
+import { AppError } from "@/domain/errors";
+import { getTransaction, listWallets } from "@/infrastructure/container";
 
 export const dynamic = "force-dynamic";
 

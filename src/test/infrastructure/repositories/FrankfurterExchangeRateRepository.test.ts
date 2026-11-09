@@ -1,5 +1,13 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { getRate } from "../rates";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ExchangeRateRepository } from "@/domain/repositories/ExchangeRateRepository";
+import { createFrankfurterExchangeRateRepository } from "@/infrastructure/repositories/FrankfurterExchangeRateRepository";
+
+// Each test gets its own cache, so caching behaviour is asserted directly
+// rather than worked around by picking unused currency pairs.
+let rates: ExchangeRateRepository;
+beforeEach(() => {
+  rates = createFrankfurterExchangeRateRepository({ cache: new Map() });
+});
 
 function okResponse(body: string) {
   return new Response(body, { status: 200, headers: { "content-type": "application/json" } });
@@ -18,7 +26,7 @@ describe("getRate", () => {
       }),
     );
 
-    const rate = await getRate("USD", "USD");
+    const rate = await rates.getRate("USD", "USD");
     expect(rate.rate).toBe("1");
   });
 
@@ -32,7 +40,7 @@ describe("getRate", () => {
       ),
     );
 
-    const rate = await getRate("USD", "EUR");
+    const rate = await rates.getRate("USD", "EUR");
     expect(rate.rate).toBe("0.893150000001");
     expect(rate.date).toBe("2026-11-09");
   });
@@ -43,8 +51,8 @@ describe("getRate", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await getRate("USD", "GBP");
-    await getRate("USD", "GBP");
+    await rates.getRate("USD", "GBP");
+    await rates.getRate("USD", "GBP");
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
@@ -57,7 +65,7 @@ describe("getRate", () => {
       }),
     );
 
-    await expect(getRate("USD", "SGD")).rejects.toMatchObject({
+    await expect(rates.getRate("USD", "SGD")).rejects.toMatchObject({
       code: "RATE_UNAVAILABLE",
       status: 503,
     });
@@ -69,7 +77,7 @@ describe("getRate", () => {
       vi.fn(async () => new Response("", { status: 500 })),
     );
 
-    await expect(getRate("USD", "AUD")).rejects.toMatchObject({
+    await expect(rates.getRate("USD", "AUD")).rejects.toMatchObject({
       code: "RATE_UNAVAILABLE",
       status: 503,
     });
@@ -78,7 +86,7 @@ describe("getRate", () => {
   it("throws RATE_UNAVAILABLE on a 2xx response with an unexpected body", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => okResponse('{"surprise":true}')));
 
-    await expect(getRate("USD", "IDR")).rejects.toMatchObject({
+    await expect(rates.getRate("USD", "IDR")).rejects.toMatchObject({
       code: "RATE_UNAVAILABLE",
       status: 503,
     });

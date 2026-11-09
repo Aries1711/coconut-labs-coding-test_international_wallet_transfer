@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { SUPPORTED_CURRENCIES } from "./currencies";
-import { AppError } from "./errors";
+import { SUPPORTED_CURRENCIES } from "@/domain/entities/Currency";
+import { AppError } from "@/domain/errors";
 
 const walletId = z.string().trim().min(1, "walletId is required");
-/** Amounts cross the wire as decimal strings; the server parses them. */
+/** Amounts cross the wire as decimal strings; the domain parses them. */
 const amount = z.string().trim().min(1, "amount is required");
 
 export const singleWalletSchema = z.object({ walletId, amount });

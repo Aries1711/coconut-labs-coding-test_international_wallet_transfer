@@ -1,5 +1,5 @@
-import type { Currency } from "./currencies";
-import { AppError } from "./errors";
+import { AppError } from "../errors";
+import type { Currency } from "./Currency";
 
 /**
  * Money is always handled as integer minor units (cents, sen, rupiah...).

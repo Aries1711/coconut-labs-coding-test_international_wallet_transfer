@@ -43,6 +43,7 @@ Both causes and fixes are in `ai_logs/2026-11-09.md`; re-run after the fix gave
 ## Not covered here
 
 Frankfurter timeout and malformed-response paths are covered by unit tests with
-`fetch` stubbed (`src/lib/service/wallet.test.ts`), not by this run — the live
+the rate provider faked (`src/test/application/useCases/walletUseCases.test.ts`
+and `src/test/infrastructure/repositories/`), not by this run — the live
 endpoint was up throughout. Double-submit is handled in the UI by disabling the
 button while a request is in flight and was exercised by hand, not scripted.

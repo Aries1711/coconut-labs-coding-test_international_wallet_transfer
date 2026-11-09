@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { WalletView } from "@/lib/types";
+import type { WalletView } from "@/domain/entities/Wallet";
 
 type Props = { wallets: WalletView[] };
 

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import WalletFilter from "@/components/WalletFilter";
-import { formatMinor } from "@/lib/money";
-import { listTransactions, listWallets } from "@/lib/service/wallet";
-import type { Transaction } from "@/lib/types";
+import { formatMinor } from "@/domain/entities/Money";
+import type { Transaction } from "@/domain/entities/Transaction";
+import { listTransactions, listWallets } from "@/infrastructure/container";
 
 export const dynamic = "force-dynamic";
 
