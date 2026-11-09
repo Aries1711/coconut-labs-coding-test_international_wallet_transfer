@@ -1,4 +1,5 @@
 import Link from "next/link";
+import WalletFilter from "@/components/WalletFilter";
 import { formatMinor } from "@/lib/money";
 import { listTransactions, listWallets } from "@/lib/service/wallet";
 import type { Transaction } from "@/lib/types";
@@ -39,29 +40,7 @@ export default async function TransactionsPage({
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="text-xl font-semibold">Transaction history</h1>
-        <form className="flex items-end gap-2" method="get">
-          <label className="text-sm">
-            <span className="mb-1 block text-slate-600">Filter by wallet</span>
-            <select
-              name="walletId"
-              defaultValue={known ?? ""}
-              className="rounded border border-slate-300 bg-white px-3 py-2 text-sm"
-            >
-              <option value="">All wallets</option>
-              {wallets.map((wallet) => (
-                <option key={wallet.id} value={wallet.id}>
-                  {wallet.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            type="submit"
-            className="rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
-          >
-            Apply
-          </button>
-        </form>
+        <WalletFilter wallets={wallets} selected={known ?? ""} />
       </div>
 
       {walletId && !known && (
