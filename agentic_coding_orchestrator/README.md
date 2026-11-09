@@ -12,6 +12,7 @@ The code and git history already show _what_ was built. These folders exist for 
 | `ai_specs/`   | One file per issue, tracking it from creation through scope changes to merge       | Created with the GitHub Issue, updated on every change       |
 | `ai_reviews/` | Acceptance test runs — what was executed, what passed, what failed, what was fixed | After each verification pass, before handing over for review |
 | `ai_logs/`    | Dated log of decisions, corrections and mistakes                                   | As they happen                                               |
+| `ai_product/` | Product knowledge — what the thing is for, its vocabulary, journeys and product calls | When product intent is established or changes              |
 
 ## What to write, and what not to
 
