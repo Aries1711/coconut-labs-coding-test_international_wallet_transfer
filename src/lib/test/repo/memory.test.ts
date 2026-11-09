@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { memoryWalletRepository as repo } from "./memory";
+import { memoryWalletRepository as repo } from "../../repo/memory";
 
 describe("memoryWalletRepository: seeded state", () => {
   it("seeds exactly the six documented wallets", () => {

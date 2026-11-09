@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { AppError } from "./errors";
-import type { ErrorCode } from "./errors";
+import { AppError } from "../errors";
+import type { ErrorCode } from "../errors";
 import {
   convertMinor,
   decimalsFor,
@@ -8,7 +8,7 @@ import {
   formatMinor,
   minorToDecimalString,
   parseAmountToMinor,
-} from "./money";
+} from "../money";
 
 /** Asserts the thrown AppError carries the expected domain code. */
 function expectErrorCode(run: () => unknown, code: ErrorCode): void {

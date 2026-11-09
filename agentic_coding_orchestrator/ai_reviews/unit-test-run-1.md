@@ -5,15 +5,19 @@ one per module in `src/lib/`: the business-logic layer, deliberately separated
 from routes and components so it is unit-testable without a server or a browser.
 
 ```
-src/lib/repo/memory.test.ts        7 tests
-src/lib/rates.test.ts              6 tests
-src/lib/errors.test.ts             3 tests
-src/lib/money.test.ts             12 tests
-src/lib/service/wallet.test.ts    14 tests
-src/lib/validation.test.ts         7 tests
-                                   -- 
-                                   49 tests, 4.2s
+src/lib/test/repo/memory.test.ts        7 tests
+src/lib/test/rates.test.ts              6 tests
+src/lib/test/errors.test.ts             3 tests
+src/lib/test/money.test.ts             12 tests
+src/lib/test/service/wallet.test.ts    14 tests
+src/lib/test/validation.test.ts         7 tests
+                                        -- 
+                                        49 tests, 4.2s
 ```
+
+Test files live under `src/lib/test/`, mirroring the module layout of the code
+they test (`src/lib/test/repo/memory.test.ts` tests `src/lib/repo/memory.ts`,
+and so on) rather than sitting next to the source files.
 
 ## Why these six files, and nothing else
 

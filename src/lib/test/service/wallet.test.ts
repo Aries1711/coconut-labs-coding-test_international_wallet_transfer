@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AppError } from "../errors";
+import { AppError } from "../../errors";
 import {
   balanceMinor,
   convert,
@@ -10,7 +10,7 @@ import {
   listWallets,
   transfer,
   withdraw,
-} from "./wallet";
+} from "../../service/wallet";
 
 function mockFrankfurter(rate: number, date = "2026-11-09") {
   vi.stubGlobal(

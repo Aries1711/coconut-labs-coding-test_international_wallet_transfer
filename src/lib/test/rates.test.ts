@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getRate } from "./rates";
+import { getRate } from "../rates";
 
 function okResponse(body: string) {
   return new Response(body, { status: 200, headers: { "content-type": "application/json" } });

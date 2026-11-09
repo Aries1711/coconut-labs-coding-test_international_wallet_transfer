@@ -135,10 +135,11 @@ src/
     api/                      9 route handlers (the whole API surface)
   components/WalletActions.tsx  client forms (fetch + pending state only)
   lib/
-    money.ts                  decimals, parsing, half-up conversion  (unit-tested)
+    money.ts                  decimals, parsing, half-up conversion
     rates.ts                  Frankfurter v2 client + 60s cache
-    service/wallet.ts         every business rule                     (unit-tested)
+    service/wallet.ts         every business rule
     repo/WalletRepository.ts  storage boundary
     repo/memory.ts            in-memory, globalThis-backed, seeded
     errors.ts validation.ts types.ts currencies.ts
+    test/                     Vitest specs, mirroring the layout above
 ```
