@@ -1,6 +1,16 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AppError } from "../errors";
-import { balanceMinor, convert, listTransactions, transfer } from "./wallet";
+import {
+  balanceMinor,
+  convert,
+  deposit,
+  getTransaction,
+  getWallet,
+  listTransactions,
+  listWallets,
+  transfer,
+  withdraw,
+} from "./wallet";
 
 function mockFrankfurter(rate: number, date = "2026-11-09") {
   vi.stubGlobal(
@@ -77,5 +87,96 @@ describe("transfer", () => {
     expect(() => transfer("usd-main", "eur-main", "1.00")).toThrowError(AppError);
     expect(() => transfer("usd-main", "usd-main", "1.00")).toThrowError(AppError);
     expect(() => transfer("ghost", "usd-main", "1.00")).toThrowError(AppError);
+  });
+});
+
+describe("deposit", () => {
+  it("credits the wallet and appends a DEPOSIT entry", () => {
+    const before = balanceMinor("eur-main");
+
+    const tx = deposit("eur-main", "12.34");
+
+    expect(tx.type).toBe("DEPOSIT");
+    expect(tx.toWalletId).toBe("eur-main");
+    expect(tx.fromWalletId).toBeUndefined();
+    expect(tx.amountMinor).toBe(1234);
+    expect(balanceMinor("eur-main")).toBe(before + 1234);
+  });
+
+  it("rejects an unknown wallet and a malformed amount without writing", () => {
+    const ledgerBefore = listTransactions().length;
+    expect(() => deposit("ghost", "1.00")).toThrowError(
+      expect.objectContaining({ code: "WALLET_NOT_FOUND" }) as unknown as Error,
+    );
+    expect(() => deposit("eur-main", "0")).toThrowError(
+      expect.objectContaining({ code: "INVALID_AMOUNT" }) as unknown as Error,
+    );
+    expect(listTransactions()).toHaveLength(ledgerBefore);
+  });
+});
+
+describe("withdraw", () => {
+  it("debits the wallet and appends a WITHDRAWAL entry", () => {
+    const before = balanceMinor("usd-savings");
+
+    const tx = withdraw("usd-savings", "15.00");
+
+    expect(tx.type).toBe("WITHDRAWAL");
+    expect(tx.fromWalletId).toBe("usd-savings");
+    expect(tx.toWalletId).toBeUndefined();
+    expect(tx.amountMinor).toBe(1500);
+    expect(balanceMinor("usd-savings")).toBe(before - 1500);
+  });
+
+  it("refuses to overdraw and writes nothing", () => {
+    const before = balanceMinor("gbp-main"); // seeded at zero, untouched elsewhere
+    const ledgerBefore = listTransactions().length;
+
+    expect(() => withdraw("gbp-main", "0.01")).toThrowError(
+      expect.objectContaining({ code: "INSUFFICIENT_FUNDS" }) as unknown as Error,
+    );
+    expect(balanceMinor("gbp-main")).toBe(before);
+    expect(listTransactions()).toHaveLength(ledgerBefore);
+  });
+});
+
+describe("listWallets / getWallet", () => {
+  it("derives every wallet's balance from the ledger", () => {
+    const wallets = listWallets();
+    const usdMain = wallets.find((wallet) => wallet.id === "usd-main");
+
+    expect(wallets).toHaveLength(6);
+    expect(usdMain?.balanceMinor).toBe(balanceMinor("usd-main"));
+    expect(usdMain?.balanceFormatted).toMatch(/^\$[\d,]+\.\d{2}$/);
+  });
+
+  it("404s for an unknown wallet", () => {
+    expect(() => getWallet("ghost")).toThrowError(
+      expect.objectContaining({ code: "WALLET_NOT_FOUND", status: 404 }) as unknown as Error,
+    );
+  });
+});
+
+describe("listTransactions / getTransaction", () => {
+  it("filters to only the entries touching one wallet", () => {
+    const filtered = listTransactions("jpy-main");
+    expect(filtered.length).toBeGreaterThan(0);
+    for (const tx of filtered) {
+      expect([tx.fromWalletId, tx.toWalletId]).toContain("jpy-main");
+    }
+  });
+
+  it("404s listing by an unknown wallet, and fetching an unknown transaction", () => {
+    expect(() => listTransactions("ghost")).toThrowError(
+      expect.objectContaining({ code: "WALLET_NOT_FOUND" }) as unknown as Error,
+    );
+    expect(() => getTransaction("does-not-exist")).toThrowError(
+      expect.objectContaining({ code: "TRANSACTION_NOT_FOUND", status: 404 }) as unknown as Error,
+    );
+  });
+
+  it("round-trips a transaction by id", () => {
+    const tx = deposit("gbp-main", "1.00");
+    expect(getTransaction(tx.id)).toEqual(tx);
   });
 });
