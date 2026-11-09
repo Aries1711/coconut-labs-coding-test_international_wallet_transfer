@@ -181,11 +181,25 @@ were measured rather than assumed; see
 ## Design decisions
 
 **Money is never a float.** Every amount is an integer count of minor units.
-Each currency's exponent comes from
-`Intl.NumberFormat(...).resolvedOptions().maximumFractionDigits` (USD 2, JPY 0).
 Decimal strings are parsed by string manipulation, so `"8.70"` is exactly `870`
-sen/cents — no `parseFloat` anywhere in the amount path. A float appears in
-exactly one place: `formatMinor`, for display.
+cents — no `parseFloat` anywhere in the amount path. A float appears in exactly
+one place: `formatMinor`, for display.
+
+**The minor-unit exponent is pinned, not derived.** `MINOR_UNIT_EXPONENT` in
+`Money.ts` is a constant table (USD 2, JPY 0, IDR 0). It was originally read
+from `Intl.NumberFormat(...).resolvedOptions().maximumFractionDigits`, as the
+brief asks — until deploying proved that unsafe. `Intl`'s answer comes from the
+CLDR data bundled with each Node build, and CLDR moved IDR from 2 fraction
+digits to 0, so local Node 22.2.0 said `2` while the deployed runtime said `0`.
+The same ledger row was then read 100× apart.
+
+Deriving a *rendering* from a library is fine — the library improving is a
+feature. Deriving the *meaning of persisted data* from one is not, because the
+library can change underneath data already written. So `Intl` still formats
+(symbol, grouping), but it no longer decides what a stored integer means. The
+table is typed `Record<Currency, number>`, so adding a currency without an
+exponent is a compile error rather than an `undefined` loose in money
+arithmetic. See issue #10.
 
 **Conversion rounds half-up in BigInt.**
 `targetMinor = roundHalfUp(sourceMinor × rate × 10^(targetDecimals − sourceDecimals))`,
@@ -234,30 +248,17 @@ writing.
 - **Daily mid-market rates.** Frankfurter publishes ECB reference rates once per
   working day, so a conversion made at 02:00 uses the previous close. No spread
   or fees are modelled, which no real provider would do.
-- **A currency's minor-unit exponent comes from the runtime, and runtimes
-  disagree.** `decimalsFor` reads
-  `Intl.NumberFormat(...).resolvedOptions().maximumFractionDigits`, as the brief
-  requires. But that value depends on the CLDR data bundled with the Node build,
-  and CLDR changed IDR from 2 fraction digits to 0. Measured, not assumed:
-
-  | Runtime | `decimalsFor("IDR")` | `balanceMinor: 1811400` renders as |
-  | --- | --- | --- |
-  | Local, Node 22.2.0 | `2` | `IDR 18,114.00` |
-  | Vercel production | `0` | `IDR 1,811,400` |
-
-  Each environment is internally consistent, so both read correctly on their
-  own. The hazard is a **shared** ledger: `amountMinor` is an integer whose
-  meaning depends on the exponent in force when it was written, so the same
-  stored row is off by 100× when read by the other runtime. This was harmless
-  while the ledger lived in one process, and became real the moment it moved to
-  Redis — including for the `vercel env pull` workflow above, which deliberately
-  points local development at the production store.
-
-  **The fix is to stop deriving stored money from a library version**: pin the
-  exponent per supported currency in a constant table, keep `Intl` for display
-  only, and record the exponent on each ledger entry so old rows stay readable
-  if the table ever changes. Not done here — it reverses an explicit
-  instruction in the brief, so it is the owner's call.
+- **Ledger rows do not record their own exponent.** The exponent table is
+  pinned (see *Design decisions*), so every runtime now agrees. But a stored
+  `amountMinor` still does not say which exponent it was written under, so
+  changing an entry in the table would silently reinterpret existing rows.
+  Today that is safe — the table is ours and changes deliberately, and IDR was
+  pinned to `0` precisely because it matches what production had already
+  written, so no migration was needed. The durable fix is to record the
+  exponent on each entry and default it for legacy rows; it was judged not
+  worth the complexity until a currency is actually added or changed, because
+  `balanceOf` would then have to normalise rows with differing exponents and
+  rescaling downward loses precision.
 - **Tailwind is pinned to v3.** Tailwind v4's compiler `require()`s an ESM
   module, which fails on Node 22.2 (it needs 22.12+); v3 + PostCSS builds on the
   toolchain this was developed against.

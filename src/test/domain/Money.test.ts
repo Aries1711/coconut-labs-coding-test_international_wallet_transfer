@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { SUPPORTED_CURRENCIES } from "@/domain/entities/Currency";
+import type { Currency } from "@/domain/entities/Currency";
 import { AppError } from "@/domain/errors";
 import type { ErrorCode } from "@/domain/errors";
 import {
@@ -23,12 +25,43 @@ function expectErrorCode(run: () => unknown, code: ErrorCode): void {
 }
 
 describe("decimalsFor", () => {
-  it("reads minor-unit exponents from Intl", () => {
-    expect(decimalsFor("USD")).toBe(2);
-    expect(decimalsFor("EUR")).toBe(2);
-    expect(decimalsFor("JPY")).toBe(0);
-    // CLDR gives IDR two fraction digits, so IDR balances are held in sen.
-    expect(decimalsFor("IDR")).toBe(2);
+  it("returns the pinned exponent for every supported currency", () => {
+    expect(SUPPORTED_CURRENCIES.map(decimalsFor)).toEqual([
+      2, // USD
+      2, // EUR
+      2, // GBP
+      0, // JPY
+      2, // SGD
+      2, // AUD
+      0, // IDR
+    ]);
+  });
+
+  /**
+   * The point of the table. These exponents are NOT read from Intl, because
+   * Intl's values come from the CLDR data bundled with the Node build: CLDR
+   * moved IDR from 2 fraction digits to 0, so local Node 22.2.0 answers 2 while
+   * the deployed runtime answers 0. `amountMinor` is an integer whose meaning
+   * depends on that exponent, so a ledger written by one runtime was misread
+   * 100x by the other.
+   *
+   * If this test ever fails, do NOT "fix" it by going back to Intl -- that is
+   * the bug. See issue #10.
+   */
+  it("does not follow the runtime when Intl disagrees with the table", () => {
+    const fromIntl = (currency: Currency) =>
+      new Intl.NumberFormat("en-US", { style: "currency", currency })
+        .resolvedOptions().maximumFractionDigits;
+
+    // Documented as a fact about this environment, not asserted as a
+    // requirement: it legitimately differs between Node builds.
+    const runtimeDisagrees = SUPPORTED_CURRENCIES.some(
+      (currency) => fromIntl(currency) !== decimalsFor(currency),
+    );
+
+    // Whatever this runtime believes, the stored meaning does not move.
+    expect(decimalsFor("IDR")).toBe(0);
+    expect(typeof runtimeDisagrees).toBe("boolean");
   });
 });
 
@@ -86,8 +119,9 @@ describe("convertMinor", () => {
     expect(convertMinor(1000, "158.26", "USD", "JPY")).toBe(1583);
     // $10.00 at 0.89315 -> 893.15 cents -> 893
     expect(convertMinor(1000, "0.89315", "USD", "EUR")).toBe(893);
-    // $10.00 at 18116 -> IDR 181,160.00 exactly (18,116,000 sen)
-    expect(convertMinor(1000, "18116", "USD", "IDR")).toBe(18_116_000);
+    // $10.00 at 18,116 IDR/USD -> IDR 181,160. IDR has exponent 0, so the
+    // minor-unit count IS the rupiah count: 1000 * 18116 * 10^(0-2).
+    expect(convertMinor(1000, "18116", "USD", "IDR")).toBe(181_160);
     // 75,000 JPY at 0.0063 -> $472.50 -> 47250 cents
     expect(convertMinor(75_000, "0.0063", "JPY", "USD")).toBe(47_250);
   });
@@ -103,8 +137,9 @@ describe("convertMinor", () => {
   });
 
   it("keeps full precision on large low-denomination amounts", () => {
-    // IDR 10,000,000.00 (1e9 sen) at 0.00653 -> $65,300.00 (6,530,000 cents)
-    expect(convertMinor(1_000_000_000, "0.00653", "IDR", "USD")).toBe(6_530_000);
+    // IDR 1,000,000,000 (exponent 0, so 1e9 minor units IS one billion rupiah)
+    // at 0.00653 -> $6,530,000.00 -> 653,000,000 cents.
+    expect(convertMinor(1_000_000_000, "0.00653", "IDR", "USD")).toBe(653_000_000);
   });
 
   it("refuses an unusable rate instead of inventing one", () => {
